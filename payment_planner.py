@@ -2,17 +2,14 @@ import flet as ft
 import requests
 import os
 
-# 1. 接続先設定（Renderの環境変数から読み込む。なければ直書きを使う）
-GAS_URL = os.getenv("GAS_URL", "***REMOVED_LEAKED_URL***")
+GAS_URL = os.getenv("GAS_URL", "YOUR_GAS_WEBAPP_URL_HERE")
 
 def main(page: ft.Page):
     page.title = "翌月資金移動プランナー"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 20
-    # 画面全体のスクロールを有効にする
     page.scroll = ft.ScrollMode.ADAPTIVE
     
-    # 状態管理用のコンテナ
     list_view = ft.Column(spacing=20, scroll=ft.ScrollMode.ADAPTIVE)
 
     def fetch_data(e=None):
@@ -20,7 +17,6 @@ def main(page: ft.Page):
         page.update()
         
         try:
-            # GASからデータ取得
             response = requests.get(GAS_URL)
             data = response.json()
             
@@ -35,7 +31,6 @@ def main(page: ft.Page):
                 grand_total += val
                 accounts[acc]["details"].append(item)
             
-            # --- 1. 全体合計のカードを追加 ---
             list_view.controls.append(
                 ft.Container(
                     content=ft.Row([
@@ -49,7 +44,6 @@ def main(page: ft.Page):
                 )
             )
             
-            # --- 2. 各口座ごとの内訳を表示 ---
             for acc_name, info in accounts.items():
                 list_view.controls.append(
                     ft.Container(
@@ -77,7 +71,6 @@ def main(page: ft.Page):
         
         page.update()
 
-    # UI構成
     page.add(
         ft.Row([
             ft.Text("来月の支払い予定", size=24, weight=ft.FontWeight.BOLD),
@@ -98,6 +91,6 @@ def main(page: ft.Page):
     fetch_data()
 
 if __name__ == "__main__":
-    # Web公開用にポート番号を環境変数から取得するように設定
     port = int(os.getenv("PORT", 8080))
-    ft.app(target=main, view=None, port=port)
+    # CLIのバグを回避し、Pythonから直接Webサーバーを立ち上げる設定
+    ft.run(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=port)
