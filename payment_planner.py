@@ -2,6 +2,7 @@ import flet as ft
 import requests
 import os
 
+# Renderの環境変数からGASのURLを読み込む
 GAS_URL = os.getenv("GAS_URL", "YOUR_GAS_WEBAPP_URL_HERE")
 
 def main(page: ft.Page):
@@ -92,5 +93,5 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
-    # CLIのバグを回避し、Pythonから直接Webサーバーを立ち上げる設定
-    ft.run(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=port)
+    # ★修正箇所：ft.run ではなく ft.app を使用します
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=port)
