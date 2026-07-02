@@ -18,7 +18,7 @@ def main(page: ft.Page):
         page.update()
         
         try:
-            response = requests.get(GAS_URL)
+            response = requests.get(GAS_URL, timeout=10)
             data = response.json()
             
             grand_total = 0
