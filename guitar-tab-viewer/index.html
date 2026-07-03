@@ -6,50 +6,50 @@
 <title>ギタータブ譜ビューア</title>
 <style>
   :root {
-    --bg: #f5f3ee;
+    --bg: #faf8f4;
     --panel: #ffffff;
-    --line: #b9b2a4;
-    --text: #2b2620;
-    --sub: #6f675a;
-    --note: #b3411f;
-    --notebg: #f7e3d9;
-    --bar: #8a8272;
-    --accent: #2e6e4e;
-    --accent-text: #ffffff;
-    --playhead: rgba(179, 65, 31, .85);
-    --playhead-glow: rgba(179, 65, 31, .12);
-    --border: #d8d2c4;
+    --line: #b6ad9c;
+    --text: #26221b;
+    --sub: #71685a;
+    --note: #8a5a13;
+    --notebg: #f4e7cf;
+    --bar: #948a77;
+    --accent: #5f4322;
+    --accent-text: #fdf9f1;
+    --playhead: rgba(194, 135, 30, .9);
+    --playhead-glow: rgba(194, 135, 30, .13);
+    --border: #ddd6c9;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #17150f;
-      --panel: #201d15;
-      --line: #57503f;
-      --text: #ece5d4;
-      --sub: #a19881;
-      --note: #ffb38a;
-      --notebg: #3a2417;
-      --bar: #7d7460;
-      --accent: #57a87b;
-      --accent-text: #10130f;
-      --playhead: rgba(255, 138, 92, .9);
-      --playhead-glow: rgba(255, 138, 92, .10);
-      --border: #3a3628;
+      --bg: #14110c;
+      --panel: #1d1913;
+      --line: #4f4738;
+      --text: #ece4d2;
+      --sub: #a2977f;
+      --note: #e8b25c;
+      --notebg: #3a2c15;
+      --bar: #786e59;
+      --accent: #d29a3f;
+      --accent-text: #1a1408;
+      --playhead: rgba(255, 194, 94, .9);
+      --playhead-glow: rgba(255, 194, 94, .10);
+      --border: #383225;
     }
   }
   :root[data-theme="light"] {
-    --bg: #f5f3ee; --panel: #ffffff; --line: #b9b2a4; --text: #2b2620;
-    --sub: #6f675a; --note: #b3411f; --notebg: #f7e3d9; --bar: #8a8272;
-    --accent: #2e6e4e; --accent-text: #ffffff;
-    --playhead: rgba(179, 65, 31, .85); --playhead-glow: rgba(179, 65, 31, .12);
-    --border: #d8d2c4;
+    --bg: #faf8f4; --panel: #ffffff; --line: #b6ad9c; --text: #26221b;
+    --sub: #71685a; --note: #8a5a13; --notebg: #f4e7cf; --bar: #948a77;
+    --accent: #5f4322; --accent-text: #fdf9f1;
+    --playhead: rgba(194, 135, 30, .9); --playhead-glow: rgba(194, 135, 30, .13);
+    --border: #ddd6c9;
   }
   :root[data-theme="dark"] {
-    --bg: #17150f; --panel: #201d15; --line: #57503f; --text: #ece5d4;
-    --sub: #a19881; --note: #ffb38a; --notebg: #3a2417; --bar: #7d7460;
-    --accent: #57a87b; --accent-text: #10130f;
-    --playhead: rgba(255, 138, 92, .9); --playhead-glow: rgba(255, 138, 92, .10);
-    --border: #3a3628;
+    --bg: #14110c; --panel: #1d1913; --line: #4f4738; --text: #ece4d2;
+    --sub: #a2977f; --note: #e8b25c; --notebg: #3a2c15; --bar: #786e59;
+    --accent: #d29a3f; --accent-text: #1a1408;
+    --playhead: rgba(255, 194, 94, .9); --playhead-glow: rgba(255, 194, 94, .10);
+    --border: #383225;
   }
 
   body {
@@ -59,8 +59,12 @@
     margin: 0;
     min-height: 100vh;
   }
-  .app { max-width: 1200px; margin: 0 auto; padding: 12px 14px 40px; }
-  h1 { font-size: 1.15rem; margin: 6px 0 2px; letter-spacing: .02em; }
+  .app { max-width: 1200px; margin: 0 auto; padding: 14px 14px 40px; }
+  .eyebrow {
+    font-size: .68rem; font-weight: 700; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--note); margin: 2px 0 0;
+  }
+  h1 { font-size: 1.2rem; margin: 2px 0 2px; letter-spacing: .02em; text-wrap: balance; }
   .tagline { color: var(--sub); font-size: .8rem; margin: 0 0 12px; }
 
   .controls {
@@ -80,6 +84,9 @@
     font-weight: 600; min-width: 96px;
   }
   button:active { transform: translateY(1px); }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--playhead); outline-offset: 2px;
+  }
   input[type="range"] { accent-color: var(--accent); width: 110px; }
   select, input[type="checkbox"] { accent-color: var(--accent); font: inherit; }
   select {
@@ -161,7 +168,8 @@
 <body>
 
 <div class="app">
-  <h1>🎸 ギタータブ譜ビューア</h1>
+  <p class="eyebrow">Guitar Tab Viewer</p>
+  <h1>ギタータブ譜ビューア</h1>
   <p class="tagline">タブ譜を大きく表示して、再生位置に合わせて楽譜が自動でスクロールします。</p>
 
   <div class="controls">
@@ -197,7 +205,7 @@
   </div>
 
   <details class="editor" id="editor">
-    <summary>📝 タブ譜を編集・貼り付け</summary>
+    <summary>タブ譜を編集・貼り付け</summary>
     <div class="editor-body">
       <textarea id="tabInput" spellcheck="false"></textarea>
       <div class="editor-actions">
@@ -211,7 +219,7 @@
   <p class="help">
     使い方: 楽譜をタップすると再生位置がそこに移動します。<kbd>スペース</kbd> で再生/停止、
     <kbd>←</kbd><kbd>→</kbd> で位置移動、<kbd>Home</kbd> で先頭に戻ります。
-    赤いバーが「いま弾く位置」で、再生中は楽譜のほうが流れていきます。
+    オレンジ色のバーが「いま弾く位置」で、再生中は楽譜のほうが流れていきます。
   </p>
 </div>
 
