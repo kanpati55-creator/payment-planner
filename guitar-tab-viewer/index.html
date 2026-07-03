@@ -18,6 +18,8 @@
     --accent-text: #fdf9f1;
     --playhead: rgba(194, 135, 30, .9);
     --playhead-glow: rgba(194, 135, 30, .13);
+    --loop: rgba(122, 154, 96, .16);
+    --loop-edge: #7a9a60;
     --border: #ddd6c9;
   }
   @media (prefers-color-scheme: dark) {
@@ -34,6 +36,8 @@
       --accent-text: #1a1408;
       --playhead: rgba(255, 194, 94, .9);
       --playhead-glow: rgba(255, 194, 94, .10);
+      --loop: rgba(148, 190, 115, .14);
+      --loop-edge: #94be73;
       --border: #383225;
     }
   }
@@ -42,6 +46,7 @@
     --sub: #71685a; --note: #8a5a13; --notebg: #f4e7cf; --bar: #948a77;
     --accent: #5f4322; --accent-text: #fdf9f1;
     --playhead: rgba(194, 135, 30, .9); --playhead-glow: rgba(194, 135, 30, .13);
+    --loop: rgba(122, 154, 96, .16); --loop-edge: #7a9a60;
     --border: #ddd6c9;
   }
   :root[data-theme="dark"] {
@@ -49,6 +54,7 @@
     --sub: #a2977f; --note: #e8b25c; --notebg: #3a2c15; --bar: #786e59;
     --accent: #d29a3f; --accent-text: #1a1408;
     --playhead: rgba(255, 194, 94, .9); --playhead-glow: rgba(255, 194, 94, .10);
+    --loop: rgba(148, 190, 115, .14); --loop-edge: #94be73;
     --border: #383225;
   }
 
@@ -83,6 +89,8 @@
     background: var(--accent); color: var(--accent-text); border-color: transparent;
     font-weight: 600; min-width: 96px;
   }
+  button.small { padding: 6px 10px; font-size: .82rem; }
+  button.loop-on { border-color: var(--loop-edge); color: var(--loop-edge); font-weight: 700; }
   button:active { transform: translateY(1px); }
   button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
     outline: 2px solid var(--playhead); outline-offset: 2px;
@@ -92,6 +100,11 @@
   select {
     background: var(--panel); color: var(--text);
     border: 1px solid var(--border); border-radius: 7px; padding: 4px 6px;
+  }
+  .loop-group { display: flex; align-items: center; gap: 6px; }
+  .loop-status {
+    font-size: .78rem; color: var(--sub); font-variant-numeric: tabular-nums;
+    min-width: 7.5em;
   }
 
   .viewer {
@@ -104,39 +117,54 @@
     -webkit-overflow-scrolling: touch;
     cursor: pointer;
   }
-  .strip-wrap { position: relative; width: max-content; padding: 26px 40vw 26px 12px; }
-  .strip {
+  .stage { position: relative; width: max-content; padding-right: 65vw; }
+  .stage svg { display: block; }
+  .sv-line { stroke: var(--line); stroke-width: 1; }
+  .sv-bar { stroke: var(--bar); stroke-width: 2; }
+  .sv-notebg { fill: var(--notebg); }
+  .sv-note {
+    fill: var(--note); font-weight: 700;
     font-family: "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
-    line-height: 1.55;
-    white-space: pre;
-    color: var(--line);
   }
-  .strip .row { display: block; }
-  .strip .n {
-    color: var(--note); font-weight: 700;
-    background: var(--notebg); border-radius: 3px;
+  .sv-tech {
+    fill: var(--sub); font-style: italic;
+    font-family: "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
   }
-  .strip .bar { color: var(--bar); }
   .labels {
-    position: absolute; top: 26px; left: 0; bottom: 26px;
-    display: flex; flex-direction: column; justify-content: flex-start;
-    padding: 0 4px 0 8px;
-    font-family: Menlo, Consolas, monospace; line-height: 1.55;
-    color: var(--sub);
-    background: linear-gradient(90deg, var(--panel) 70%, transparent);
+    position: absolute; top: 0; left: 0; bottom: 0; width: 30px;
+    background: linear-gradient(90deg, var(--panel) 62%, transparent);
     pointer-events: none; z-index: 3;
   }
+  .labels span {
+    position: absolute; left: 9px; transform: translateY(-50%);
+    font-family: Menlo, Consolas, monospace; color: var(--sub);
+  }
   .playhead {
-    position: absolute; top: 8px; bottom: 8px; width: 3px;
+    position: absolute; top: 6px; bottom: 6px; width: 3px;
     background: var(--playhead); border-radius: 2px;
     box-shadow: 0 0 0 7px var(--playhead-glow);
     pointer-events: none; z-index: 2;
     transform: translateX(0);
   }
+  .loop-region {
+    position: absolute; top: 0; bottom: 0;
+    background: var(--loop);
+    border-left: 2px solid var(--loop-edge);
+    border-right: 2px solid var(--loop-edge);
+    pointer-events: none; z-index: 1;
+  }
+  .loop-region::before, .loop-region::after {
+    position: absolute; top: 2px;
+    font-size: .68rem; font-weight: 700; color: var(--loop-edge);
+    padding: 0 4px;
+  }
+  .loop-region::before { content: "A"; left: 0; }
+  .loop-region::after { content: "B"; right: 0; }
   .pos-readout {
     position: absolute; right: 10px; top: 6px;
     font-size: .75rem; color: var(--sub); z-index: 4;
     font-variant-numeric: tabular-nums;
+    background: var(--panel); padding: 0 4px; border-radius: 4px;
   }
 
   details.editor { margin-top: 14px; }
@@ -191,13 +219,20 @@
       <output id="zoomOut">24</output><span>px</span>
     </label>
     <label class="ctl"><input type="checkbox" id="metro"> メトロノーム</label>
+    <span class="loop-group ctl">リピート
+      <button id="loopABtn" class="small" title="いまの位置を区間の開始(A)にする">A</button>
+      <button id="loopBBtn" class="small" title="いまの位置を区間の終了(B)にする">B</button>
+      <button id="loopClearBtn" class="small" title="リピート解除">解除</button>
+      <span class="loop-status" id="loopStatus">未設定</span>
+    </span>
   </div>
 
   <div class="viewer">
     <div class="labels" id="labels"></div>
     <div class="scroller" id="scroller">
-      <div class="strip-wrap" id="stripWrap">
-        <div class="strip" id="strip"></div>
+      <div class="stage" id="stage">
+        <div class="loop-region" id="loopRegion" hidden></div>
+        <svg id="tabSvg" xmlns="http://www.w3.org/2000/svg"></svg>
         <div class="playhead" id="playhead"></div>
       </div>
     </div>
@@ -205,11 +240,14 @@
   </div>
 
   <details class="editor" id="editor">
-    <summary>タブ譜を編集・貼り付け</summary>
+    <summary>タブ譜を編集・貼り付け・保存</summary>
     <div class="editor-body">
       <textarea id="tabInput" spellcheck="false"></textarea>
       <div class="editor-actions">
         <button id="loadBtn" class="primary">読み込む</button>
+        <button id="saveBtn">ファイルへ保存</button>
+        <button id="openBtn">ファイルを開く</button>
+        <input type="file" id="fileInput" accept=".txt,.tab,text/plain" hidden>
         <span class="hint">6弦分(e B G D A E)のASCIIタブ譜を貼り付けてください。複数段あれば自動でつなげます。</span>
       </div>
       <div class="parse-msg" id="parseMsg"></div>
@@ -218,8 +256,10 @@
 
   <p class="help">
     使い方: 楽譜をタップすると再生位置がそこに移動します。<kbd>スペース</kbd> で再生/停止、
-    <kbd>←</kbd><kbd>→</kbd> で位置移動、<kbd>Home</kbd> で先頭に戻ります。
+    <kbd>←</kbd><kbd>→</kbd> で位置移動、<kbd>Home</kbd> で先頭、
+    <kbd>A</kbd><kbd>B</kbd> でリピート区間の設定、<kbd>Esc</kbd> で解除。
     オレンジ色のバーが「いま弾く位置」で、再生中は楽譜のほうが流れていきます。
+    A-B区間を設定すると、その区間だけを繰り返し練習できます。
   </p>
 </div>
 
@@ -252,21 +292,27 @@
     "E|--------------------------------|--------------------------------|\n";
 
   var STRING_NAMES = ["e", "B", "G", "D", "A", "E"];
+  var STORE_KEY = "guitar-tab-viewer.tab";
 
   var $ = function (id) { return document.getElementById(id); };
-  var scroller = $("scroller"), strip = $("strip"), stripWrap = $("stripWrap");
+  var scroller = $("scroller"), stage = $("stage"), tabSvg = $("tabSvg");
   var playhead = $("playhead"), labels = $("labels"), posReadout = $("posReadout");
+  var loopRegion = $("loopRegion"), loopStatus = $("loopStatus");
   var playBtn = $("playBtn");
 
   var rows = [];          // 6 strings of equal-length text
   var totalCols = 0;
+  var barCols = [];       // column indices of barlines
   var pos = 0;            // playhead position in columns (float)
   var playing = false;
-  var charW = 12;
   var lastT = 0;
   var lastBeat = -1;
   var rafId = 0;
   var audioCtx = null;
+  var loopA = null, loopB = null;
+
+  // layout metrics, recomputed from the zoom slider in render()
+  var colW = 15, padLeft = 14, lineYs = [], svgH = 0;
 
   // ---- parsing --------------------------------------------------------
 
@@ -316,40 +362,92 @@
     return { rows: out, systems: systems };
   }
 
-  // ---- rendering ------------------------------------------------------
-
-  function escapeHtml(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  function findBarCols() {
+    barCols = [];
+    for (var c = 0; c < totalCols; c++) {
+      var n = 0;
+      for (var i = 0; i < 6; i++) if (rows[i].charAt(c) === "|") n++;
+      if (n >= 4) barCols.push(c);
+    }
   }
 
+  // ---- SVG rendering --------------------------------------------------
+
   function render() {
-    var html = "";
-    for (var i = 0; i < rows.length; i++) {
-      var line = escapeHtml(rows[i])
-        .replace(/\d+/g, '<span class="n">$&</span>')
-        .replace(/\|/g, '<span class="bar">|</span>');
-      html += '<span class="row">' + line + "</span>";
+    var Z = parseInt($("zoom").value, 10);
+    colW = Z * 0.62;
+    var lineGap = Z * 1.5;
+    var padTop = Z * 1.1;
+    svgH = Math.round(padTop * 2 + lineGap * 5);
+    var svgW = Math.round(padLeft + totalCols * colW + 30);
+
+    lineYs = [];
+    var parts = [], i, c;
+
+    for (i = 0; i < 6; i++) {
+      var y = Math.round(padTop + i * lineGap) + 0.5;
+      lineYs.push(y);
+      parts.push('<line class="sv-line" x1="0" y1="' + y + '" x2="' + svgW + '" y2="' + y + '"/>');
     }
-    strip.innerHTML = html;
+    for (i = 0; i < barCols.length; i++) {
+      var bx = (padLeft + (barCols[i] + 0.5) * colW).toFixed(1);
+      parts.push('<line class="sv-bar" x1="' + bx + '" y1="' + lineYs[0] + '" x2="' + bx + '" y2="' + lineYs[5] + '"/>');
+    }
+
+    var noteFont = (Z * 0.92).toFixed(1);
+    var techFont = (Z * 0.62).toFixed(1);
+    var noteRe = /\d+/g, m;
+    for (i = 0; i < 6; i++) {
+      var row = rows[i];
+      // fret numbers with a rounded plate behind them
+      noteRe.lastIndex = 0;
+      while ((m = noteRe.exec(row)) !== null) {
+        var cx = padLeft + (m.index + m[0].length / 2) * colW;
+        var w = m[0].length * Z * 0.62 + Z * 0.34;
+        var h = Z * 1.12;
+        parts.push('<rect class="sv-notebg" x="' + (cx - w / 2).toFixed(1) + '" y="' + (lineYs[i] - h / 2).toFixed(1) +
+          '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + (Z * 0.18).toFixed(1) + '"/>');
+        parts.push('<text class="sv-note" x="' + cx.toFixed(1) + '" y="' + lineYs[i] +
+          '" font-size="' + noteFont + '" text-anchor="middle" dominant-baseline="central">' + m[0] + "</text>");
+      }
+      // technique marks: h p / \ ~ b r x etc.
+      for (c = 0; c < row.length; c++) {
+        var ch = row.charAt(c);
+        if (ch === "-" || ch === "|" || ch === " " || (ch >= "0" && ch <= "9")) continue;
+        var tx = padLeft + (c + 0.5) * colW;
+        parts.push('<text class="sv-tech" x="' + tx.toFixed(1) + '" y="' + (lineYs[i] - Z * 0.15).toFixed(1) +
+          '" font-size="' + techFont + '" text-anchor="middle" dominant-baseline="central">' +
+          ch.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</text>");
+      }
+    }
+
+    tabSvg.setAttribute("width", svgW);
+    tabSvg.setAttribute("height", svgH);
+    tabSvg.setAttribute("viewBox", "0 0 " + svgW + " " + svgH);
+    tabSvg.innerHTML = parts.join("");
+
     labels.innerHTML = STRING_NAMES
-      .map(function (n) { return '<span class="row">' + n + "</span>"; })
+      .map(function (n, k) {
+        return '<span style="top:' + lineYs[k] + 'px;font-size:' + (Z * 0.68).toFixed(1) + 'px">' + n + "</span>";
+      })
       .join("");
-    measure();
+
+    updateLoopUI();
     updateView(true);
   }
 
-  function measure() {
-    var probe = document.createElement("span");
-    probe.textContent = "----------";
-    probe.style.visibility = "hidden";
-    strip.appendChild(probe);
-    charW = probe.getBoundingClientRect().width / 10;
-    strip.removeChild(probe);
+  function playheadX() { return padLeft + pos * colW; }
+
+  function measureOf(col) {
+    var n = 0;
+    for (var i = 0; i < barCols.length; i++) if (barCols[i] < col) n++;
+    return n + 1;
   }
 
-  function playheadX() {
-    // strip starts 12px into strip-wrap (padding-left)
-    return 12 + pos * charW;
+  function totalMeasures() {
+    if (!barCols.length) return 0;
+    // a trailing barline closes the last measure instead of opening a new one
+    return barCols[barCols.length - 1] >= totalCols - 2 ? barCols.length : barCols.length + 1;
   }
 
   function updateView(forceScroll) {
@@ -359,10 +457,51 @@
     var target = Math.max(0, x - anchor);
     if (playing || forceScroll) scroller.scrollLeft = target;
     if (totalCols > 0) {
-      posReadout.textContent = Math.min(totalCols, Math.floor(pos) + 1) + " / " + totalCols;
+      var text = Math.min(totalCols, Math.floor(pos) + 1) + " / " + totalCols + " 列";
+      var tm = totalMeasures();
+      if (tm) text = Math.min(tm, measureOf(pos)) + " / " + tm + " 小節 · " + text;
+      posReadout.textContent = text;
     } else {
       posReadout.textContent = "";
     }
+  }
+
+  // ---- A-B loop -------------------------------------------------------
+
+  function updateLoopUI() {
+    var hasLoop = loopA !== null && loopB !== null;
+    loopRegion.hidden = !hasLoop;
+    if (hasLoop) {
+      loopRegion.style.left = (padLeft + loopA * colW) + "px";
+      loopRegion.style.width = ((loopB - loopA) * colW) + "px";
+    }
+    $("loopABtn").classList.toggle("loop-on", loopA !== null);
+    $("loopBBtn").classList.toggle("loop-on", loopB !== null);
+    if (loopA === null && loopB === null) {
+      loopStatus.textContent = "未設定";
+    } else {
+      loopStatus.textContent =
+        "A:" + (loopA === null ? "–" : loopA + 1) + " B:" + (loopB === null ? "–" : loopB + 1);
+    }
+  }
+
+  function setLoopA() {
+    loopA = Math.max(0, Math.floor(pos));
+    if (loopB !== null && loopB <= loopA) loopB = null;
+    updateLoopUI();
+  }
+
+  function setLoopB() {
+    var b = Math.min(totalCols, Math.ceil(pos));
+    if (loopA === null) loopA = 0;
+    if (b <= loopA) return;
+    loopB = b;
+    updateLoopUI();
+  }
+
+  function clearLoop() {
+    loopA = loopB = null;
+    updateLoopUI();
   }
 
   // ---- playback -------------------------------------------------------
@@ -387,6 +526,10 @@
     if (!playing) return;
     if (lastT) {
       pos += colsPerSec() * (t - lastT) / 1000;
+      if (loopA !== null && loopB !== null && pos >= loopB) {
+        pos = loopA;
+        lastBeat = Math.floor(pos / colsPerBeat()) - 1;
+      }
       var beat = Math.floor(pos / colsPerBeat());
       if (beat !== lastBeat) { click(beat % 4 === 0); lastBeat = beat; }
       if (pos >= totalCols) { pos = totalCols; setPlaying(false); }
@@ -401,7 +544,7 @@
     playBtn.textContent = on ? "⏸ 停止" : "▶ 再生";
     lastT = 0;
     if (on) {
-      if (pos >= totalCols) pos = 0;
+      if (pos >= totalCols) pos = loopA !== null ? loopA : 0;
       lastBeat = Math.floor(pos / colsPerBeat()) - 1;
       if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
       rafId = requestAnimationFrame(tick);
@@ -411,25 +554,72 @@
     }
   }
 
+  // ---- load / save ----------------------------------------------------
+
+  function loadTab(text, sourceLabel) {
+    var parsed = parseTab(text);
+    var msg = $("parseMsg");
+    if (!parsed) {
+      msg.textContent = "タブ譜を読み取れませんでした。6行1組(各弦1行)の形式か確認してください。";
+      return false;
+    }
+    rows = parsed.rows;
+    totalCols = rows[0].length;
+    findBarCols();
+    pos = 0;
+    clearLoop();
+    setPlaying(false);
+    render();
+    msg.textContent = (sourceLabel ? sourceLabel + " から " : "") +
+      parsed.systems + "段のタブ譜を読み込みました(全" + totalCols + "列)。";
+    try { localStorage.setItem(STORE_KEY, text); } catch (e) { /* private mode etc. */ }
+    return true;
+  }
+
+  function guessTitle() {
+    var lines = $("tabInput").value.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var s = lines[i].trim();
+      if (s && !looksLikeTabLine(lines[i])) {
+        return s.replace(/[\\\/:*?"<>|]/g, "").slice(0, 40);
+      }
+    }
+    return "";
+  }
+
+  function saveFile() {
+    var blob = new Blob([$("tabInput").value], { type: "text/plain;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (guessTitle() || "guitar-tab") + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    $("parseMsg").textContent = "「" + a.download + "」として保存しました。";
+  }
+
   // ---- wiring ---------------------------------------------------------
 
   playBtn.addEventListener("click", function () { setPlaying(!playing); });
   $("rewindBtn").addEventListener("click", function () {
-    pos = 0; updateView(true);
+    pos = loopA !== null ? loopA : 0;
+    updateView(true);
   });
 
   $("bpm").addEventListener("input", function () { $("bpmOut").textContent = this.value; });
   $("zoom").addEventListener("input", function () {
     $("zoomOut").textContent = this.value;
-    strip.style.fontSize = this.value + "px";
-    labels.style.fontSize = this.value + "px";
-    measure();
-    updateView(true);
+    render();
   });
 
+  $("loopABtn").addEventListener("click", setLoopA);
+  $("loopBBtn").addEventListener("click", setLoopB);
+  $("loopClearBtn").addEventListener("click", clearLoop);
+
   scroller.addEventListener("click", function (e) {
-    var rect = stripWrap.getBoundingClientRect();
-    var col = (e.clientX - rect.left - 12) / charW;
+    var rect = stage.getBoundingClientRect();
+    var col = (e.clientX - rect.left - padLeft) / colW;
     pos = Math.max(0, Math.min(totalCols, col));
     lastBeat = Math.floor(pos / colsPerBeat()) - 1;
     updateView(false);
@@ -441,31 +631,41 @@
     else if (e.code === "ArrowRight") { pos = Math.min(totalCols, pos + colsPerBeat() * 2); updateView(true); }
     else if (e.code === "ArrowLeft") { pos = Math.max(0, pos - colsPerBeat() * 2); updateView(true); }
     else if (e.code === "Home") { pos = 0; updateView(true); }
+    else if (e.code === "KeyA") { setLoopA(); }
+    else if (e.code === "KeyB") { setLoopB(); }
+    else if (e.code === "Escape") { clearLoop(); }
   });
 
   $("loadBtn").addEventListener("click", function () {
-    var parsed = parseTab($("tabInput").value);
-    var msg = $("parseMsg");
-    if (!parsed) {
-      msg.textContent = "タブ譜を読み取れませんでした。6行1組(各弦1行)の形式か確認してください。";
-      return;
-    }
-    msg.textContent = parsed.systems + "段のタブ譜を読み込みました(全" + parsed.rows[0].length + "列)。";
-    rows = parsed.rows;
-    totalCols = rows[0].length;
-    pos = 0;
-    setPlaying(false);
-    render();
+    loadTab($("tabInput").value);
+  });
+
+  $("saveBtn").addEventListener("click", saveFile);
+  $("openBtn").addEventListener("click", function () { $("fileInput").click(); });
+  $("fileInput").addEventListener("change", function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      $("tabInput").value = reader.result;
+      loadTab(reader.result, "「" + file.name + "」");
+    };
+    reader.readAsText(file);
+    this.value = "";
   });
 
   // ---- init -----------------------------------------------------------
 
-  $("tabInput").value = SAMPLE;
-  strip.style.fontSize = $("zoom").value + "px";
-  labels.style.fontSize = $("zoom").value + "px";
-  var initial = parseTab(SAMPLE);
+  var initialText = SAMPLE;
+  try {
+    var saved = localStorage.getItem(STORE_KEY);
+    if (saved && parseTab(saved)) initialText = saved;
+  } catch (e) { /* storage unavailable */ }
+  $("tabInput").value = initialText;
+  var initial = parseTab(initialText);
   rows = initial.rows;
   totalCols = rows[0].length;
+  findBarCols();
   render();
   window.addEventListener("resize", function () { updateView(false); });
 })();
