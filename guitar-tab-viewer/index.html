@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ギタータブ譜ビューア</title>
+<style>
+  :root {
+    --bg: #f5f3ee;
+    --panel: #ffffff;
+    --line: #b9b2a4;
+    --text: #2b2620;
+    --sub: #6f675a;
+    --note: #b3411f;
+    --notebg: #f7e3d9;
+    --bar: #8a8272;
+    --accent: #2e6e4e;
+    --accent-text: #ffffff;
+    --playhead: rgba(179, 65, 31, .85);
+    --playhead-glow: rgba(179, 65, 31, .12);
+    --border: #d8d2c4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17150f;
+      --panel: #201d15;
+      --line: #57503f;
+      --text: #ece5d4;
+      --sub: #a19881;
+      --note: #ffb38a;
+      --notebg: #3a2417;
+      --bar: #7d7460;
+      --accent: #57a87b;
+      --accent-text: #10130f;
+      --playhead: rgba(255, 138, 92, .9);
+      --playhead-glow: rgba(255, 138, 92, .10);
+      --border: #3a3628;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f3ee; --panel: #ffffff; --line: #b9b2a4; --text: #2b2620;
+    --sub: #6f675a; --note: #b3411f; --notebg: #f7e3d9; --bar: #8a8272;
+    --accent: #2e6e4e; --accent-text: #ffffff;
+    --playhead: rgba(179, 65, 31, .85); --playhead-glow: rgba(179, 65, 31, .12);
+    --border: #d8d2c4;
+  }
+  :root[data-theme="dark"] {
+    --bg: #17150f; --panel: #201d15; --line: #57503f; --text: #ece5d4;
+    --sub: #a19881; --note: #ffb38a; --notebg: #3a2417; --bar: #7d7460;
+    --accent: #57a87b; --accent-text: #10130f;
+    --playhead: rgba(255, 138, 92, .9); --playhead-glow: rgba(255, 138, 92, .10);
+    --border: #3a3628;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+  .app { max-width: 1200px; margin: 0 auto; padding: 12px 14px 40px; }
+  h1 { font-size: 1.15rem; margin: 6px 0 2px; letter-spacing: .02em; }
+  .tagline { color: var(--sub); font-size: .8rem; margin: 0 0 12px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+  }
+  .ctl { display: flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--sub); }
+  .ctl output { color: var(--text); font-variant-numeric: tabular-nums; min-width: 2.6em; }
+  button {
+    font: inherit; border: 1px solid var(--border); border-radius: 9px;
+    background: var(--panel); color: var(--text);
+    padding: 8px 14px; cursor: pointer; touch-action: manipulation;
+  }
+  button.primary {
+    background: var(--accent); color: var(--accent-text); border-color: transparent;
+    font-weight: 600; min-width: 96px;
+  }
+  button:active { transform: translateY(1px); }
+  input[type="range"] { accent-color: var(--accent); width: 110px; }
+  select, input[type="checkbox"] { accent-color: var(--accent); font: inherit; }
+  select {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 7px; padding: 4px 6px;
+  }
+
+  .viewer {
+    position: relative;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .scroller {
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    cursor: pointer;
+  }
+  .strip-wrap { position: relative; width: max-content; padding: 26px 40vw 26px 12px; }
+  .strip {
+    font-family: "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+    line-height: 1.55;
+    white-space: pre;
+    color: var(--line);
+  }
+  .strip .row { display: block; }
+  .strip .n {
+    color: var(--note); font-weight: 700;
+    background: var(--notebg); border-radius: 3px;
+  }
+  .strip .bar { color: var(--bar); }
+  .labels {
+    position: absolute; top: 26px; left: 0; bottom: 26px;
+    display: flex; flex-direction: column; justify-content: flex-start;
+    padding: 0 4px 0 8px;
+    font-family: Menlo, Consolas, monospace; line-height: 1.55;
+    color: var(--sub);
+    background: linear-gradient(90deg, var(--panel) 70%, transparent);
+    pointer-events: none; z-index: 3;
+  }
+  .playhead {
+    position: absolute; top: 8px; bottom: 8px; width: 3px;
+    background: var(--playhead); border-radius: 2px;
+    box-shadow: 0 0 0 7px var(--playhead-glow);
+    pointer-events: none; z-index: 2;
+    transform: translateX(0);
+  }
+  .pos-readout {
+    position: absolute; right: 10px; top: 6px;
+    font-size: .75rem; color: var(--sub); z-index: 4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  details.editor { margin-top: 14px; }
+  details.editor summary {
+    cursor: pointer; font-size: .9rem; color: var(--sub);
+    padding: 6px 2px; user-select: none;
+  }
+  .editor-body {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin-top: 6px;
+  }
+  textarea {
+    width: 100%; box-sizing: border-box; min-height: 220px;
+    font-family: Menlo, Consolas, monospace; font-size: 13px;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+    white-space: pre; overflow-x: auto;
+  }
+  .editor-actions { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .hint { font-size: .75rem; color: var(--sub); }
+  .parse-msg { font-size: .8rem; color: var(--note); min-height: 1.2em; margin-top: 6px; }
+  .help { font-size: .78rem; color: var(--sub); margin-top: 10px; line-height: 1.7; }
+  kbd {
+    border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+    padding: 0 5px; font-size: .85em; background: var(--panel);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <h1>🎸 ギタータブ譜ビューア</h1>
+  <p class="tagline">タブ譜を大きく表示して、再生位置に合わせて楽譜が自動でスクロールします。</p>
+
+  <div class="controls">
+    <button id="playBtn" class="primary">▶ 再生</button>
+    <button id="rewindBtn" title="先頭に戻る">⏮ 先頭</button>
+    <label class="ctl">テンポ
+      <input type="range" id="bpm" min="30" max="240" value="80">
+      <output id="bpmOut">80</output><span>BPM</span>
+    </label>
+    <label class="ctl">1列の長さ
+      <select id="res">
+        <option value="1">4分音符</option>
+        <option value="2" selected>8分音符</option>
+        <option value="4">16分音符</option>
+      </select>
+    </label>
+    <label class="ctl">拡大
+      <input type="range" id="zoom" min="14" max="46" value="24">
+      <output id="zoomOut">24</output><span>px</span>
+    </label>
+    <label class="ctl"><input type="checkbox" id="metro"> メトロノーム</label>
+  </div>
+
+  <div class="viewer">
+    <div class="labels" id="labels"></div>
+    <div class="scroller" id="scroller">
+      <div class="strip-wrap" id="stripWrap">
+        <div class="strip" id="strip"></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+    </div>
+    <div class="pos-readout" id="posReadout"></div>
+  </div>
+
+  <details class="editor" id="editor">
+    <summary>📝 タブ譜を編集・貼り付け</summary>
+    <div class="editor-body">
+      <textarea id="tabInput" spellcheck="false"></textarea>
+      <div class="editor-actions">
+        <button id="loadBtn" class="primary">読み込む</button>
+        <span class="hint">6弦分(e B G D A E)のASCIIタブ譜を貼り付けてください。複数段あれば自動でつなげます。</span>
+      </div>
+      <div class="parse-msg" id="parseMsg"></div>
+    </div>
+  </details>
+
+  <p class="help">
+    使い方: 楽譜をタップすると再生位置がそこに移動します。<kbd>スペース</kbd> で再生/停止、
+    <kbd>←</kbd><kbd>→</kbd> で位置移動、<kbd>Home</kbd> で先頭に戻ります。
+    赤いバーが「いま弾く位置」で、再生中は楽譜のほうが流れていきます。
+  </p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SAMPLE =
+    "きらきら星 (サンプル)\n" +
+    "\n" +
+    "e|--------3---3---5---5---3-------|1---1---0---0-------------------|\n" +
+    "B|1---1---------------------------|----------------3---3---1-------|\n" +
+    "G|--------------------------------|--------------------------------|\n" +
+    "D|--------------------------------|--------------------------------|\n" +
+    "A|--------------------------------|--------------------------------|\n" +
+    "E|--------------------------------|--------------------------------|\n" +
+    "\n" +
+    "e|3---3---1---1---0---0-----------|3---3---1---1---0---0-----------|\n" +
+    "B|------------------------3-------|------------------------3-------|\n" +
+    "G|--------------------------------|--------------------------------|\n" +
+    "D|--------------------------------|--------------------------------|\n" +
+    "A|--------------------------------|--------------------------------|\n" +
+    "E|--------------------------------|--------------------------------|\n" +
+    "\n" +
+    "e|--------3---3---5---5---3-------|1---1---0---0-------------------|\n" +
+    "B|1---1---------------------------|----------------3---3---1-------|\n" +
+    "G|--------------------------------|--------------------------------|\n" +
+    "D|--------------------------------|--------------------------------|\n" +
+    "A|--------------------------------|--------------------------------|\n" +
+    "E|--------------------------------|--------------------------------|\n";
+
+  var STRING_NAMES = ["e", "B", "G", "D", "A", "E"];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var scroller = $("scroller"), strip = $("strip"), stripWrap = $("stripWrap");
+  var playhead = $("playhead"), labels = $("labels"), posReadout = $("posReadout");
+  var playBtn = $("playBtn");
+
+  var rows = [];          // 6 strings of equal-length text
+  var totalCols = 0;
+  var pos = 0;            // playhead position in columns (float)
+  var playing = false;
+  var charW = 12;
+  var lastT = 0;
+  var lastBeat = -1;
+  var rafId = 0;
+  var audioCtx = null;
+
+  // ---- parsing --------------------------------------------------------
+
+  function looksLikeTabLine(line) {
+    var s = line.replace(/\s+$/, "");
+    if ((s.match(/-/g) || []).length < 3) return false;
+    var body = s.replace(/^\s*[A-Ga-g]?[#b]?\s*(?=\|)/, "");
+    var ok = (body.match(/[-|0-9hpbrsxX\/\\~^*.()<>= ]/g) || []).length;
+    return body.length > 0 && ok / body.length >= 0.85;
+  }
+
+  function stripLabel(line) {
+    // remove leading string name ("e", "B", "D#"...) but keep the barline
+    return line.replace(/\s+$/, "").replace(/^\s*[A-Ga-g][#b]?\s*(?=\|)/, "").replace(/^\s+/, "");
+  }
+
+  function parseTab(text) {
+    var lines = text.split(/\r?\n/);
+    var groups = [], cur = [];
+    for (var i = 0; i < lines.length; i++) {
+      if (looksLikeTabLine(lines[i])) {
+        cur.push(lines[i]);
+      } else if (cur.length) {
+        groups.push(cur); cur = [];
+      }
+    }
+    if (cur.length) groups.push(cur);
+
+    var out = ["", "", "", "", "", ""];
+    var systems = 0;
+    for (var g = 0; g < groups.length; g++) {
+      for (var s = 0; s + 6 <= groups[g].length; s += 6) {
+        var sys = [], maxLen = 0, k;
+        for (k = 0; k < 6; k++) {
+          var content = stripLabel(groups[g][s + k]);
+          sys.push(content);
+          maxLen = Math.max(maxLen, content.length);
+        }
+        for (k = 0; k < 6; k++) {
+          while (sys[k].length < maxLen) sys[k] += "-";
+          out[k] += sys[k];
+        }
+        systems++;
+      }
+    }
+    if (!systems) return null;
+    return { rows: out, systems: systems };
+  }
+
+  // ---- rendering ------------------------------------------------------
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function render() {
+    var html = "";
+    for (var i = 0; i < rows.length; i++) {
+      var line = escapeHtml(rows[i])
+        .replace(/\d+/g, '<span class="n">$&</span>')
+        .replace(/\|/g, '<span class="bar">|</span>');
+      html += '<span class="row">' + line + "</span>";
+    }
+    strip.innerHTML = html;
+    labels.innerHTML = STRING_NAMES
+      .map(function (n) { return '<span class="row">' + n + "</span>"; })
+      .join("");
+    measure();
+    updateView(true);
+  }
+
+  function measure() {
+    var probe = document.createElement("span");
+    probe.textContent = "----------";
+    probe.style.visibility = "hidden";
+    strip.appendChild(probe);
+    charW = probe.getBoundingClientRect().width / 10;
+    strip.removeChild(probe);
+  }
+
+  function playheadX() {
+    // strip starts 12px into strip-wrap (padding-left)
+    return 12 + pos * charW;
+  }
+
+  function updateView(forceScroll) {
+    var x = playheadX();
+    playhead.style.transform = "translateX(" + x + "px)";
+    var anchor = Math.min(scroller.clientWidth * 0.32, 320);
+    var target = Math.max(0, x - anchor);
+    if (playing || forceScroll) scroller.scrollLeft = target;
+    if (totalCols > 0) {
+      posReadout.textContent = Math.min(totalCols, Math.floor(pos) + 1) + " / " + totalCols;
+    } else {
+      posReadout.textContent = "";
+    }
+  }
+
+  // ---- playback -------------------------------------------------------
+
+  function colsPerBeat() { return parseInt($("res").value, 10); }
+  function colsPerSec() { return ($("bpm").value / 60) * colsPerBeat(); }
+
+  function click(accent) {
+    if (!$("metro").checked) return;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.frequency.value = accent ? 1568 : 1047;
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.07);
+  }
+
+  function tick(t) {
+    if (!playing) return;
+    if (lastT) {
+      pos += colsPerSec() * (t - lastT) / 1000;
+      var beat = Math.floor(pos / colsPerBeat());
+      if (beat !== lastBeat) { click(beat % 4 === 0); lastBeat = beat; }
+      if (pos >= totalCols) { pos = totalCols; setPlaying(false); }
+      updateView(false);
+    }
+    lastT = t;
+    if (playing) rafId = requestAnimationFrame(tick);
+  }
+
+  function setPlaying(on) {
+    playing = on;
+    playBtn.textContent = on ? "⏸ 停止" : "▶ 再生";
+    lastT = 0;
+    if (on) {
+      if (pos >= totalCols) pos = 0;
+      lastBeat = Math.floor(pos / colsPerBeat()) - 1;
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      rafId = requestAnimationFrame(tick);
+    } else {
+      cancelAnimationFrame(rafId);
+      updateView(false);
+    }
+  }
+
+  // ---- wiring ---------------------------------------------------------
+
+  playBtn.addEventListener("click", function () { setPlaying(!playing); });
+  $("rewindBtn").addEventListener("click", function () {
+    pos = 0; updateView(true);
+  });
+
+  $("bpm").addEventListener("input", function () { $("bpmOut").textContent = this.value; });
+  $("zoom").addEventListener("input", function () {
+    $("zoomOut").textContent = this.value;
+    strip.style.fontSize = this.value + "px";
+    labels.style.fontSize = this.value + "px";
+    measure();
+    updateView(true);
+  });
+
+  scroller.addEventListener("click", function (e) {
+    var rect = stripWrap.getBoundingClientRect();
+    var col = (e.clientX - rect.left - 12) / charW;
+    pos = Math.max(0, Math.min(totalCols, col));
+    lastBeat = Math.floor(pos / colsPerBeat()) - 1;
+    updateView(false);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.code === "Space") { e.preventDefault(); setPlaying(!playing); }
+    else if (e.code === "ArrowRight") { pos = Math.min(totalCols, pos + colsPerBeat() * 2); updateView(true); }
+    else if (e.code === "ArrowLeft") { pos = Math.max(0, pos - colsPerBeat() * 2); updateView(true); }
+    else if (e.code === "Home") { pos = 0; updateView(true); }
+  });
+
+  $("loadBtn").addEventListener("click", function () {
+    var parsed = parseTab($("tabInput").value);
+    var msg = $("parseMsg");
+    if (!parsed) {
+      msg.textContent = "タブ譜を読み取れませんでした。6行1組(各弦1行)の形式か確認してください。";
+      return;
+    }
+    msg.textContent = parsed.systems + "段のタブ譜を読み込みました(全" + parsed.rows[0].length + "列)。";
+    rows = parsed.rows;
+    totalCols = rows[0].length;
+    pos = 0;
+    setPlaying(false);
+    render();
+  });
+
+  // ---- init -----------------------------------------------------------
+
+  $("tabInput").value = SAMPLE;
+  strip.style.fontSize = $("zoom").value + "px";
+  labels.style.fontSize = $("zoom").value + "px";
+  var initial = parseTab(SAMPLE);
+  rows = initial.rows;
+  totalCols = rows[0].length;
+  render();
+  window.addEventListener("resize", function () { updateView(false); });
+})();
+</script>
+</body>
+</html>
