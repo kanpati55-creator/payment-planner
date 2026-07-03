@@ -1,0 +1,42 @@
+# 🚗 Gyro Car Dashboard
+
+iPhoneをクルマのダッシュボードに固定して使う、ジャイロ計器Webアプリです。
+単一のHTMLファイル（`index.html`）だけで動作し、アプリのインストールは不要です。
+
+## 表示できるもの
+
+| 計器 | 使用センサー | 内容 |
+|---|---|---|
+| ATTITUDE（姿勢計） | ジャイロ（DeviceOrientation） | ロール・ピッチを水平儀スタイルで表示 |
+| G-FORCE（Gメーター） | 加速度（DeviceMotion） | 横G・前後Gをフリクションサークル表示、最大G記録 |
+| SPEED | GPS（Geolocation） | 速度 km/h |
+| HEADING | コンパス / GPS | 方位（度 + 16方位） |
+| ALTITUDE | GPS | 標高 m |
+
+## 使い方
+
+1. **HTTPSで配信する**（iOSのセンサーAPIはHTTPS必須）
+   - 一番簡単なのは GitHub Pages で公開する方法
+   - ローカル確認なら `npx serve gyro-dashboard` + ngrok などでもOK
+2. iPhoneのSafariでページを開き、**START** をタップ
+3. 「動作と方向」へのアクセスを **許可**、位置情報も許可
+4. iPhoneを縦向き（ポートレート）でダッシュボードのホルダーに固定
+5. 停車中に **水平キャリブレーション** をタップして傾きのゼロ点を合わせる
+
+ホーム画面に追加すると全画面のアプリとして使えます。
+
+## 技術メモ
+
+- **iOS 13以降**では `DeviceMotionEvent.requestPermission()` を
+  ユーザー操作（タップ）から呼ぶ必要があるため、STARTボタンを設けています。
+- ジャイロ（回転角）は `deviceorientation` の beta/gamma、
+  Gは `devicemotion` の `acceleration`（重力除去済み）を使用し、
+  ローパスフィルタで平滑化しています。
+- 速度はiPhoneのGPSドップラー速度（`coords.speed`）なので、
+  トンネル内や低速では表示されないことがあります。
+- 縦向き固定を想定した軸マッピングです。横向きで使う場合は要調整。
+
+## ⚠️ 注意
+
+- 運転中に画面を注視・操作しないでください。
+- 本アプリの表示は参考値です。速度は必ず車両のスピードメーターで確認してください。

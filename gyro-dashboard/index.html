@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Gyro Car Dashboard</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #141926;
+    --line: #2a3247;
+    --text: #e8ecf5;
+    --dim: #8b94a8;
+    --accent: #33d17a;
+    --warn: #f6c445;
+    --danger: #f2545b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", sans-serif;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+    gap: 10px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.08em; color: var(--dim); }
+  #status { font-size: 12px; color: var(--dim); }
+  #status.ok { color: var(--accent); }
+
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 10px;
+    min-height: 0;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+  .panel .label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    margin-bottom: 4px;
+  }
+  .value { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .value .unit { font-size: 0.45em; font-weight: 500; color: var(--dim); margin-left: 2px; }
+
+  #speedPanel { grid-column: 1 / -1; }
+  #speedVal { font-size: clamp(48px, 16vw, 84px); line-height: 1; }
+
+  #horizonPanel, #gPanel { aspect-ratio: auto; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .canvasWrap { width: 100%; flex: 1; min-height: 0; position: relative; }
+  .readout {
+    display: flex;
+    gap: 14px;
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .readout b { color: var(--text); font-weight: 600; }
+
+  #headingPanel .value { font-size: clamp(26px, 8vw, 40px); }
+  #altPanel .value { font-size: clamp(26px, 8vw, 40px); }
+
+  /* start overlay */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 24px;
+    text-align: center;
+    z-index: 10;
+  }
+  #overlay h2 { font-size: 22px; }
+  #overlay p { color: var(--dim); font-size: 14px; line-height: 1.7; max-width: 30em; }
+  #startBtn {
+    font-size: 18px;
+    font-weight: 700;
+    color: #06210f;
+    background: var(--accent);
+    border: none;
+    border-radius: 999px;
+    padding: 16px 48px;
+    cursor: pointer;
+  }
+  #startBtn:active { transform: scale(0.97); }
+  #err { color: var(--danger); font-size: 13px; min-height: 1.2em; }
+  #calBtn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--dim);
+    border-radius: 999px;
+    padding: 8px 20px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <h2>🚗 Gyro Car Dashboard</h2>
+  <p>
+    iPhoneをクルマのダッシュボードに固定して使う計器アプリです。<br>
+    ジャイロで<b>ロール／ピッチ（傾斜計)</b>、加速度センサーで<b>Gメーター</b>、
+    GPSで<b>速度</b>と<b>方位</b>を表示します。<br><br>
+    ⚠️ 運転中は画面を注視しないでください。設定・キャリブレーションは必ず停車中に行ってください。
+  </p>
+  <button id="startBtn">START</button>
+  <div id="err"></div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>GYRO DASHBOARD</h1>
+    <div id="status">sensors: —</div>
+  </header>
+
+  <div class="grid">
+    <div class="panel" id="speedPanel">
+      <div class="label">SPEED</div>
+      <div class="value" id="speedVal">--<span class="unit">km/h</span></div>
+    </div>
+
+    <div class="panel" id="horizonPanel">
+      <div class="label">ATTITUDE</div>
+      <div class="canvasWrap"><canvas id="horizon"></canvas></div>
+      <div class="readout">
+        <span>ROLL <b id="rollVal">0°</b></span>
+        <span>PITCH <b id="pitchVal">0°</b></span>
+      </div>
+    </div>
+
+    <div class="panel" id="gPanel">
+      <div class="label">G-FORCE</div>
+      <div class="canvasWrap"><canvas id="gball"></canvas></div>
+      <div class="readout">
+        <span>NOW <b id="gVal">0.00G</b></span>
+        <span>MAX <b id="gMax">0.00G</b></span>
+      </div>
+    </div>
+
+    <div class="panel" id="headingPanel">
+      <div class="label">HEADING</div>
+      <div class="value" id="headingVal">--<span class="unit">°</span></div>
+      <div class="readout"><span id="headingDir">—</span></div>
+    </div>
+
+    <div class="panel" id="altPanel">
+      <div class="label">ALTITUDE</div>
+      <div class="value" id="altVal">--<span class="unit">m</span></div>
+      <button id="calBtn">水平キャリブレーション</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const overlay = $("overlay"), errEl = $("err"), statusEl = $("status");
+
+  // ---- state ----
+  const state = {
+    roll: 0, pitch: 0,          // degrees (calibrated)
+    rollRaw: 0, pitchRaw: 0,    // degrees (raw)
+    rollZero: 0, pitchZero: 0,  // calibration offsets
+    gx: 0, gy: 0,               // lateral / longitudinal G (smoothed)
+    gMax: 0,
+    speed: null,                // km/h
+    heading: null,              // degrees
+    alt: null,                  // meters
+  };
+
+  const DIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+
+  // ---- sensors ----
+  function onOrientation(e) {
+    if (e.beta === null || e.gamma === null) return;
+    // Portrait mount assumed: beta = pitch, gamma = roll.
+    state.pitchRaw = e.beta - 90; // 90° = phone standing upright on dash
+    state.rollRaw = e.gamma;
+    state.pitch = state.pitchRaw - state.pitchZero;
+    state.roll = state.rollRaw - state.rollZero;
+    if (e.webkitCompassHeading !== undefined && !Number.isNaN(e.webkitCompassHeading)) {
+      state.heading = e.webkitCompassHeading;
+    } else if (e.absolute && e.alpha !== null) {
+      state.heading = (360 - e.alpha) % 360;
+    }
+  }
+
+  function onMotion(e) {
+    const a = e.acceleration;
+    if (!a || a.x === null) return;
+    const G = 9.80665, k = 0.15; // low-pass filter
+    // Portrait mount: x = lateral, z(toward driver) = longitudinal
+    state.gx = state.gx + k * ((a.x / G) - state.gx);
+    state.gy = state.gy + k * ((-a.z / G) - state.gy);
+    const mag = Math.hypot(state.gx, state.gy);
+    if (mag > state.gMax) state.gMax = mag;
+  }
+
+  function startGeolocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.watchPosition(
+      (pos) => {
+        state.speed = pos.coords.speed !== null ? pos.coords.speed * 3.6 : null;
+        state.alt = pos.coords.altitude;
+        if (state.heading === null && pos.coords.heading !== null && !Number.isNaN(pos.coords.heading)) {
+          state.heading = pos.coords.heading;
+        }
+      },
+      () => { /* GPS unavailable — leave speed blank */ },
+      { enableHighAccuracy: true, maximumAge: 500, timeout: 10000 }
+    );
+  }
+
+  async function requestSensorPermission() {
+    // iOS 13+ requires an explicit permission request from a user gesture.
+    if (typeof DeviceMotionEvent !== "undefined" &&
+        typeof DeviceMotionEvent.requestPermission === "function") {
+      const m = await DeviceMotionEvent.requestPermission();
+      if (m !== "granted") throw new Error("モーションセンサーの利用が許可されませんでした");
+    }
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
+      const o = await DeviceOrientationEvent.requestPermission();
+      if (o !== "granted") throw new Error("ジャイロの利用が許可されませんでした");
+    }
+    window.addEventListener("deviceorientation", onOrientation);
+    window.addEventListener("devicemotion", onMotion);
+  }
+
+  // ---- canvases ----
+  function fitCanvas(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.parentElement.getBoundingClientRect();
+    canvas.width = Math.max(1, r.width * dpr);
+    canvas.height = Math.max(1, r.height * dpr);
+    return dpr;
+  }
+
+  const horizonC = $("horizon"), gballC = $("gball");
+
+  function drawHorizon() {
+    const dpr = fitCanvas(horizonC);
+    const ctx = horizonC.getContext("2d");
+    const w = horizonC.width, h = horizonC.height;
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 4 * dpr;
+    const roll = state.roll * Math.PI / 180;
+    const pitchPx = Math.max(-R, Math.min(R, state.pitch / 45 * R));
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.translate(cx, cy);
+    ctx.rotate(-roll);
+    ctx.translate(0, pitchPx);
+    // sky / ground
+    ctx.fillStyle = "#1d4f8b";
+    ctx.fillRect(-R * 2, -R * 3, R * 4, R * 3);
+    ctx.fillStyle = "#5b4322";
+    ctx.fillRect(-R * 2, 0, R * 4, R * 3);
+    // horizon line
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath(); ctx.moveTo(-R * 2, 0); ctx.lineTo(R * 2, 0); ctx.stroke();
+    // pitch ladder every 10°
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 1.5 * dpr;
+    for (let d = -30; d <= 30; d += 10) {
+      if (d === 0) continue;
+      const y = -d / 45 * R;
+      ctx.beginPath(); ctx.moveTo(-R * 0.25, y); ctx.lineTo(R * 0.25, y); ctx.stroke();
+    }
+    ctx.restore();
+
+    // fixed aircraft symbol
+    ctx.strokeStyle = "#f6c445";
+    ctx.lineWidth = 3 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(cx - R * 0.4, cy); ctx.lineTo(cx - R * 0.12, cy);
+    ctx.moveTo(cx + R * 0.12, cy); ctx.lineTo(cx + R * 0.4, cy);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 3 * dpr, 0, Math.PI * 2); ctx.stroke();
+
+    // bezel
+    ctx.strokeStyle = "#2a3247";
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  function drawGBall() {
+    const dpr = fitCanvas(gballC);
+    const ctx = gballC.getContext("2d");
+    const w = gballC.width, h = gballC.height;
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 4 * dpr;
+    const scale = 1.0; // outer ring = 1.0 G
+
+    ctx.clearRect(0, 0, w, h);
+    // rings 0.5G / 1.0G
+    ctx.strokeStyle = "#2a3247";
+    ctx.lineWidth = 1.5 * dpr;
+    for (const g of [0.5, 1.0]) {
+      ctx.beginPath(); ctx.arc(cx, cy, R * g / scale, 0, Math.PI * 2); ctx.stroke();
+    }
+    // crosshair
+    ctx.beginPath();
+    ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+    ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
+    ctx.stroke();
+
+    // G dot (clamped to ring)
+    let gx = state.gx / scale, gy = state.gy / scale;
+    const m = Math.hypot(gx, gy);
+    if (m > 1) { gx /= m; gy /= m; }
+    const mag = Math.hypot(state.gx, state.gy);
+    ctx.fillStyle = mag > 0.8 ? "#f2545b" : mag > 0.4 ? "#f6c445" : "#33d17a";
+    ctx.beginPath();
+    ctx.arc(cx + gx * R, cy + gy * R, 7 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- render loop ----
+  function fmt(n, digits = 0) {
+    return n === null || Number.isNaN(n) ? "--" : n.toFixed(digits);
+  }
+
+  function render() {
+    drawHorizon();
+    drawGBall();
+    $("rollVal").textContent = fmt(state.roll, 1) + "°";
+    $("pitchVal").textContent = fmt(state.pitch, 1) + "°";
+    $("gVal").textContent = Math.hypot(state.gx, state.gy).toFixed(2) + "G";
+    $("gMax").textContent = state.gMax.toFixed(2) + "G";
+    $("speedVal").innerHTML = fmt(state.speed) + '<span class="unit">km/h</span>';
+    $("headingVal").innerHTML = fmt(state.heading) + '<span class="unit">°</span>';
+    $("headingDir").textContent = state.heading === null
+      ? "—" : DIRS[Math.round(state.heading / 22.5) % 16];
+    $("altVal").innerHTML = fmt(state.alt) + '<span class="unit">m</span>';
+    requestAnimationFrame(render);
+  }
+
+  // ---- wiring ----
+  $("startBtn").addEventListener("click", async () => {
+    errEl.textContent = "";
+    try {
+      await requestSensorPermission();
+      startGeolocation();
+      overlay.style.display = "none";
+      statusEl.textContent = "sensors: active";
+      statusEl.classList.add("ok");
+      if (navigator.wakeLock) {
+        navigator.wakeLock.request("screen").catch(() => {});
+      }
+      requestAnimationFrame(render);
+    } catch (e) {
+      errEl.textContent = e.message +
+        "（Safariの設定 > プライバシー > モーションと画面の向きへのアクセス を確認してください）";
+    }
+  });
+
+  $("calBtn").addEventListener("click", () => {
+    state.rollZero = state.rollRaw;
+    state.pitchZero = state.pitchRaw;
+    state.gMax = 0;
+  });
+})();
+</script>
+</body>
+</html>
