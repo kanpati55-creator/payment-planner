@@ -104,6 +104,13 @@
     background: var(--panel); color: var(--text);
     border: 1px solid var(--border); border-radius: 7px; padding: 4px 6px;
   }
+  #songSel { max-width: 170px; }
+  input[type="text"] {
+    font: inherit; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px;
+    width: 14em; max-width: 100%;
+  }
+  button.danger-armed { border-color: #c0452c; color: #c0452c; font-weight: 700; }
   .loop-group { display: flex; align-items: center; gap: 6px; }
   .loop-status {
     font-size: .78rem; color: var(--sub); font-variant-numeric: tabular-nums;
@@ -223,6 +230,9 @@
       <output id="zoomOut">24</output><span>px</span>
     </label>
     <label class="ctl"><input type="checkbox" id="metro"> メトロノーム</label>
+    <label class="ctl">曲
+      <select id="songSel"></select>
+    </label>
     <span class="loop-group ctl">リピート
       <button id="loopABtn" class="small" title="いまの位置を区間の開始(A)にする">A</button>
       <button id="loopBBtn" class="small" title="いまの位置を区間の終了(B)にする">B</button>
@@ -246,13 +256,18 @@
   <details class="editor" id="editor">
     <summary>タブ譜を編集・貼り付け・保存</summary>
     <div class="editor-body">
+      <div class="editor-actions" style="margin-top:0;margin-bottom:8px;">
+        <label class="ctl">タイトル <input type="text" id="songTitle" placeholder="曲名を入力"></label>
+        <button id="newSongBtn">+ 新しい曲</button>
+        <button id="delSongBtn">この曲を削除</button>
+      </div>
       <textarea id="tabInput" spellcheck="false"></textarea>
       <div class="editor-actions">
-        <button id="loadBtn" class="primary">読み込む</button>
+        <button id="loadBtn" class="primary">読み込んで保存</button>
         <button id="saveBtn">ファイルへ保存</button>
         <button id="openBtn">ファイルを開く</button>
         <input type="file" id="fileInput" accept=".txt,.tab,text/plain" hidden>
-        <span class="hint">6弦分(e B G D A E)のASCIIタブ譜を貼り付けてください。複数段あれば自動でつなげます。</span>
+        <span class="hint">6弦分(e B G D A E)のASCIIタブ譜を貼り付けて「読み込んで保存」。曲は端末内の曲リストに保存され、上の「曲」メニューで切り替えられます。</span>
       </div>
       <div class="parse-msg" id="parseMsg"></div>
     </div>
@@ -296,7 +311,14 @@
     "E|--------------------------------|--------------------------------|\n";
 
   var STRING_NAMES = ["e", "B", "G", "D", "A", "E"];
-  var STORE_KEY = "guitar-tab-viewer.tab";
+  var LEGACY_KEY = "guitar-tab-viewer.tab";
+  var SONGS_KEY = "guitar-tab-viewer.songs.v1";
+  var LAST_KEY = "guitar-tab-viewer.lastSong";
+  var TEMPLATE = STRING_NAMES
+    .map(function (n) {
+      return n + "|" + new Array(33).join("-") + "|" + new Array(33).join("-") + "|";
+    })
+    .join("\n") + "\n";
 
   var $ = function (id) { return document.getElementById(id); };
   var scroller = $("scroller"), stage = $("stage"), tabSvg = $("tabSvg");
@@ -304,6 +326,8 @@
   var loopRegion = $("loopRegion"), loopStatus = $("loopStatus");
   var playBtn = $("playBtn");
 
+  var songs = [];         // {id, title, text, updated}
+  var currentSongId = null;
   var rows = [];          // 6 strings of equal-length text
   var totalCols = 0;
   var barCols = [];       // column indices of barlines
@@ -558,9 +582,9 @@
     }
   }
 
-  // ---- load / save ----------------------------------------------------
+  // ---- song list (stored only in this browser) ------------------------
 
-  function loadTab(text, sourceLabel) {
+  function applyTab(text, sourceLabel) {
     var parsed = parseTab(text);
     var msg = $("parseMsg");
     if (!parsed) {
@@ -576,12 +600,11 @@
     render();
     msg.textContent = (sourceLabel ? sourceLabel + " から " : "") +
       parsed.systems + "段のタブ譜を読み込みました(全" + totalCols + "列)。";
-    try { localStorage.setItem(STORE_KEY, text); } catch (e) { /* private mode etc. */ }
     return true;
   }
 
-  function guessTitle() {
-    var lines = $("tabInput").value.split(/\r?\n/);
+  function titleFromText(text) {
+    var lines = text.split(/\r?\n/);
     for (var i = 0; i < lines.length; i++) {
       var s = lines[i].trim();
       if (s && !looksLikeTabLine(lines[i])) {
@@ -591,11 +614,106 @@
     return "";
   }
 
+  function mkSong(title, text) {
+    return {
+      id: "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      title: title, text: text, updated: Date.now()
+    };
+  }
+
+  function getSong(id) {
+    for (var i = 0; i < songs.length; i++) if (songs[i].id === id) return songs[i];
+    return null;
+  }
+
+  function persistSongs() {
+    try {
+      localStorage.setItem(SONGS_KEY, JSON.stringify(songs));
+      if (currentSongId) localStorage.setItem(LAST_KEY, currentSongId);
+    } catch (e) { /* private mode etc. — list only lives until reload */ }
+  }
+
+  function populateSongSel() {
+    var sel = $("songSel");
+    sel.innerHTML = "";
+    songs.forEach(function (s) {
+      var o = document.createElement("option");
+      o.value = s.id;
+      o.textContent = s.title || "無題";
+      sel.appendChild(o);
+    });
+    if (currentSongId) sel.value = currentSongId;
+  }
+
+  function selectSong(id) {
+    var s = getSong(id);
+    if (!s) return;
+    currentSongId = id;
+    $("tabInput").value = s.text;
+    $("songTitle").value = s.title;
+    applyTab(s.text);
+    populateSongSel();
+    persistSongs();
+  }
+
+  function commitCurrentSong() {
+    var text = $("tabInput").value;
+    if (!applyTab(text)) return;
+    var title = $("songTitle").value.trim() || titleFromText(text) || "無題";
+    $("songTitle").value = title;
+    var s = getSong(currentSongId);
+    if (!s) {
+      s = mkSong(title, text);
+      songs.push(s);
+      currentSongId = s.id;
+    } else {
+      s.title = title;
+      s.text = text;
+      s.updated = Date.now();
+    }
+    persistSongs();
+    populateSongSel();
+    $("parseMsg").textContent = "「" + title + "」を曲リストに保存しました(全" + totalCols + "列)。";
+  }
+
+  function newSong() {
+    var s = mkSong("新しい曲", TEMPLATE);
+    songs.push(s);
+    selectSong(s.id);
+    $("editor").open = true;
+    $("parseMsg").textContent = "空のタブ譜を作りました。タイトルとタブ譜を入力して「読み込んで保存」を押してください。";
+    $("songTitle").focus();
+    $("songTitle").select();
+  }
+
+  function deleteCurrentSong() {
+    var btn = $("delSongBtn");
+    if (!btn.dataset.armed) {
+      btn.dataset.armed = "1";
+      btn.classList.add("danger-armed");
+      btn.textContent = "本当に削除する";
+      setTimeout(function () {
+        delete btn.dataset.armed;
+        btn.classList.remove("danger-armed");
+        btn.textContent = "この曲を削除";
+      }, 3000);
+      return;
+    }
+    delete btn.dataset.armed;
+    btn.classList.remove("danger-armed");
+    btn.textContent = "この曲を削除";
+    songs = songs.filter(function (s) { return s.id !== currentSongId; });
+    if (!songs.length) songs.push(mkSong("きらきら星 (サンプル)", SAMPLE));
+    persistSongs();
+    selectSong(songs[0].id);
+  }
+
   function saveFile() {
     var blob = new Blob([$("tabInput").value], { type: "text/plain;charset=utf-8" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = (guessTitle() || "guitar-tab") + ".txt";
+    var name = $("songTitle").value.trim() || titleFromText($("tabInput").value) || "guitar-tab";
+    a.download = name.replace(/[\\\/:*?"<>|]/g, "") + ".txt";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -640,9 +758,10 @@
     else if (e.code === "Escape") { clearLoop(); }
   });
 
-  $("loadBtn").addEventListener("click", function () {
-    loadTab($("tabInput").value);
-  });
+  $("loadBtn").addEventListener("click", commitCurrentSong);
+  $("songSel").addEventListener("change", function () { selectSong(this.value); });
+  $("newSongBtn").addEventListener("click", newSong);
+  $("delSongBtn").addEventListener("click", deleteCurrentSong);
 
   $("saveBtn").addEventListener("click", saveFile);
   $("openBtn").addEventListener("click", function () { $("fileInput").click(); });
@@ -651,8 +770,15 @@
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
+      if (!applyTab(reader.result, "「" + file.name + "」")) return;
+      var title = file.name.replace(/\.[^.]+$/, "") || "無題";
+      var s = mkSong(title, reader.result);
+      songs.push(s);
+      currentSongId = s.id;
       $("tabInput").value = reader.result;
-      loadTab(reader.result, "「" + file.name + "」");
+      $("songTitle").value = title;
+      persistSongs();
+      populateSongSel();
     };
     reader.readAsText(file);
     this.value = "";
@@ -660,17 +786,25 @@
 
   // ---- init -----------------------------------------------------------
 
-  var initialText = SAMPLE;
   try {
-    var saved = localStorage.getItem(STORE_KEY);
-    if (saved && parseTab(saved)) initialText = saved;
-  } catch (e) { /* storage unavailable */ }
-  $("tabInput").value = initialText;
-  var initial = parseTab(initialText);
-  rows = initial.rows;
-  totalCols = rows[0].length;
-  findBarCols();
-  render();
+    songs = JSON.parse(localStorage.getItem(SONGS_KEY)) || [];
+    if (!Array.isArray(songs)) songs = [];
+  } catch (e) { songs = []; }
+  songs = songs.filter(function (s) {
+    return s && typeof s.text === "string" && parseTab(s.text);
+  });
+  if (!songs.length) {
+    // migrate the pre-song-list single saved tab, if any
+    var legacy = null;
+    try { legacy = localStorage.getItem(LEGACY_KEY); } catch (e) { /* ignore */ }
+    if (legacy && parseTab(legacy)) {
+      songs.push(mkSong(titleFromText(legacy) || "保存していた曲", legacy));
+    }
+    songs.push(mkSong("きらきら星 (サンプル)", SAMPLE));
+  }
+  var lastId = null;
+  try { lastId = localStorage.getItem(LAST_KEY); } catch (e) { /* ignore */ }
+  selectSong(getSong(lastId) ? lastId : songs[0].id);
   window.addEventListener("resize", function () { updateView(false); });
 })();
 </script>
