@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-title" content="タブ譜">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+<link rel="icon" href="./apple-touch-icon.png">
+<title>ギタータブ譜ビューア</title>
+<style>
+  :root {
+    --bg: #faf8f4;
+    --panel: #ffffff;
+    --line: #b6ad9c;
+    --text: #26221b;
+    --sub: #71685a;
+    --note: #8a5a13;
+    --notebg: #f4e7cf;
+    --bar: #948a77;
+    --accent: #5f4322;
+    --accent-text: #fdf9f1;
+    --playhead: rgba(194, 135, 30, .9);
+    --playhead-glow: rgba(194, 135, 30, .13);
+    --loop: rgba(122, 154, 96, .16);
+    --loop-edge: #7a9a60;
+    --border: #ddd6c9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14110c;
+      --panel: #1d1913;
+      --line: #4f4738;
+      --text: #ece4d2;
+      --sub: #a2977f;
+      --note: #e8b25c;
+      --notebg: #3a2c15;
+      --bar: #786e59;
+      --accent: #d29a3f;
+      --accent-text: #1a1408;
+      --playhead: rgba(255, 194, 94, .9);
+      --playhead-glow: rgba(255, 194, 94, .10);
+      --loop: rgba(148, 190, 115, .14);
+      --loop-edge: #94be73;
+      --border: #383225;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #faf8f4; --panel: #ffffff; --line: #b6ad9c; --text: #26221b;
+    --sub: #71685a; --note: #8a5a13; --notebg: #f4e7cf; --bar: #948a77;
+    --accent: #5f4322; --accent-text: #fdf9f1;
+    --playhead: rgba(194, 135, 30, .9); --playhead-glow: rgba(194, 135, 30, .13);
+    --loop: rgba(122, 154, 96, .16); --loop-edge: #7a9a60;
+    --border: #ddd6c9;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14110c; --panel: #1d1913; --line: #4f4738; --text: #ece4d2;
+    --sub: #a2977f; --note: #e8b25c; --notebg: #3a2c15; --bar: #786e59;
+    --accent: #d29a3f; --accent-text: #1a1408;
+    --playhead: rgba(255, 194, 94, .9); --playhead-glow: rgba(255, 194, 94, .10);
+    --loop: rgba(148, 190, 115, .14); --loop-edge: #94be73;
+    --border: #383225;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+  .app { max-width: 1200px; margin: 0 auto; padding: 14px 14px 40px; }
+  .eyebrow {
+    font-size: .68rem; font-weight: 700; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--note); margin: 2px 0 0;
+  }
+  h1 { font-size: 1.2rem; margin: 2px 0 2px; letter-spacing: .02em; text-wrap: balance; }
+  .tagline { color: var(--sub); font-size: .8rem; margin: 0 0 12px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+  }
+  .ctl { display: flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--sub); }
+  .ctl output { color: var(--text); font-variant-numeric: tabular-nums; min-width: 2.6em; }
+  button {
+    font: inherit; border: 1px solid var(--border); border-radius: 9px;
+    background: var(--panel); color: var(--text);
+    padding: 8px 14px; cursor: pointer; touch-action: manipulation;
+  }
+  button.primary {
+    background: var(--accent); color: var(--accent-text); border-color: transparent;
+    font-weight: 600; min-width: 96px;
+  }
+  button.small { padding: 6px 10px; font-size: .82rem; }
+  button.loop-on { border-color: var(--loop-edge); color: var(--loop-edge); font-weight: 700; }
+  button:active { transform: translateY(1px); }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--playhead); outline-offset: 2px;
+  }
+  input[type="range"] { accent-color: var(--accent); width: 110px; }
+  select, input[type="checkbox"] { accent-color: var(--accent); font: inherit; }
+  select {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 7px; padding: 4px 6px;
+  }
+  .loop-group { display: flex; align-items: center; gap: 6px; }
+  .loop-status {
+    font-size: .78rem; color: var(--sub); font-variant-numeric: tabular-nums;
+    min-width: 7.5em;
+  }
+
+  .viewer {
+    position: relative;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .scroller {
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    cursor: pointer;
+  }
+  .stage { position: relative; width: max-content; padding-right: 65vw; }
+  .stage svg { display: block; }
+  .sv-line { stroke: var(--line); stroke-width: 1; }
+  .sv-bar { stroke: var(--bar); stroke-width: 2; }
+  .sv-notebg { fill: var(--notebg); }
+  .sv-note {
+    fill: var(--note); font-weight: 700;
+    font-family: "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+  }
+  .sv-tech {
+    fill: var(--sub); font-style: italic;
+    font-family: "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+  }
+  .labels {
+    position: absolute; top: 0; left: 0; bottom: 0; width: 30px;
+    background: linear-gradient(90deg, var(--panel) 62%, transparent);
+    pointer-events: none; z-index: 3;
+  }
+  .labels span {
+    position: absolute; left: 9px; transform: translateY(-50%);
+    font-family: Menlo, Consolas, monospace; color: var(--sub);
+  }
+  .playhead {
+    position: absolute; top: 6px; bottom: 6px; width: 3px;
+    background: var(--playhead); border-radius: 2px;
+    box-shadow: 0 0 0 7px var(--playhead-glow);
+    pointer-events: none; z-index: 2;
+    transform: translateX(0);
+  }
+  .loop-region {
+    position: absolute; top: 0; bottom: 0;
+    background: var(--loop);
+    border-left: 2px solid var(--loop-edge);
+    border-right: 2px solid var(--loop-edge);
+    pointer-events: none; z-index: 1;
+  }
+  .loop-region::before, .loop-region::after {
+    position: absolute; top: 2px;
+    font-size: .68rem; font-weight: 700; color: var(--loop-edge);
+    padding: 0 4px;
+  }
+  .loop-region::before { content: "A"; left: 0; }
+  .loop-region::after { content: "B"; right: 0; }
+  .pos-readout {
+    position: absolute; right: 10px; top: 6px;
+    font-size: .75rem; color: var(--sub); z-index: 4;
+    font-variant-numeric: tabular-nums;
+    background: var(--panel); padding: 0 4px; border-radius: 4px;
+  }
+
+  details.editor { margin-top: 14px; }
+  details.editor summary {
+    cursor: pointer; font-size: .9rem; color: var(--sub);
+    padding: 6px 2px; user-select: none;
+  }
+  .editor-body {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin-top: 6px;
+  }
+  textarea {
+    width: 100%; box-sizing: border-box; min-height: 220px;
+    font-family: Menlo, Consolas, monospace; font-size: 13px;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+    white-space: pre; overflow-x: auto;
+  }
+  .editor-actions { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .hint { font-size: .75rem; color: var(--sub); }
+  .parse-msg { font-size: .8rem; color: var(--note); min-height: 1.2em; margin-top: 6px; }
+  .help { font-size: .78rem; color: var(--sub); margin-top: 10px; line-height: 1.7; }
+  kbd {
+    border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+    padding: 0 5px; font-size: .85em; background: var(--panel);
+  }
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <p class="eyebrow">Guitar Tab Viewer</p>
+  <h1>ギタータブ譜ビューア</h1>
+  <p class="tagline">タブ譜を大きく表示して、再生位置に合わせて楽譜が自動でスクロールします。</p>
+
+  <div class="controls">
+    <button id="playBtn" class="primary">▶ 再生</button>
+    <button id="rewindBtn" title="先頭に戻る">⏮ 先頭</button>
+    <label class="ctl">テンポ
+      <input type="range" id="bpm" min="30" max="240" value="80">
+      <output id="bpmOut">80</output><span>BPM</span>
+    </label>
+    <label class="ctl">1列の長さ
+      <select id="res">
+        <option value="1">4分音符</option>
+        <option value="2" selected>8分音符</option>
+        <option value="4">16分音符</option>
+      </select>
+    </label>
+    <label class="ctl">拡大
+      <input type="range" id="zoom" min="14" max="46" value="24">
+      <output id="zoomOut">24</output><span>px</span>
+    </label>
+    <label class="ctl"><input type="checkbox" id="metro"> メトロノーム</label>
+    <span class="loop-group ctl">リピート
+      <button id="loopABtn" class="small" title="いまの位置を区間の開始(A)にする">A</button>
+      <button id="loopBBtn" class="small" title="いまの位置を区間の終了(B)にする">B</button>
+      <button id="loopClearBtn" class="small" title="リピート解除">解除</button>
+      <span class="loop-status" id="loopStatus">未設定</span>
+    </span>
+  </div>
+
+  <div class="viewer">
+    <div class="labels" id="labels"></div>
+    <div class="scroller" id="scroller">
+      <div class="stage" id="stage">
+        <div class="loop-region" id="loopRegion" hidden></div>
+        <svg id="tabSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="playhead" id="playhead"></div>
+      </div>
+    </div>
+    <div class="pos-readout" id="posReadout"></div>
+  </div>
+
+  <details class="editor" id="editor">
+    <summary>タブ譜を編集・貼り付け・保存</summary>
+    <div class="editor-body">
+      <textarea id="tabInput" spellcheck="false"></textarea>
+      <div class="editor-actions">
+        <button id="loadBtn" class="primary">読み込む</button>
+        <button id="saveBtn">ファイルへ保存</button>
+        <button id="openBtn">ファイルを開く</button>
+        <input type="file" id="fileInput" accept=".txt,.tab,text/plain" hidden>
+        <span class="hint">6弦分(e B G D A E)のASCIIタブ譜を貼り付けてください。複数段あれば自動でつなげます。</span>
+      </div>
+      <div class="parse-msg" id="parseMsg"></div>
+    </div>
+  </details>
+
+  <p class="help">
+    使い方: 楽譜をタップすると再生位置がそこに移動します。<kbd>スペース</kbd> で再生/停止、
+    <kbd>←</kbd><kbd>→</kbd> で位置移動、<kbd>Home</kbd> で先頭、
+    <kbd>A</kbd><kbd>B</kbd> でリピート区間の設定、<kbd>Esc</kbd> で解除。
+    オレンジ色のバーが「いま弾く位置」で、再生中は楽譜のほうが流れていきます。
+    A-B区間を設定すると、その区間だけを繰り返し練習できます。
+  </p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SAMPLE =
+    "きらきら星 (サンプル)\n" +
+    "\n" +
+    "e|--------3---3---5---5---3-------|1---1---0---0-------------------|\n" +
+    "B|1---1---------------------------|----------------3---3---1-------|\n" +
+    "G|--------------------------------|--------------------------------|\n" +
+    "D|--------------------------------|--------------------------------|\n" +
+    "A|--------------------------------|--------------------------------|\n" +
+    "E|--------------------------------|--------------------------------|\n" +
+    "\n" +
+    "e|3---3---1---1---0---0-----------|3---3---1---1---0---0-----------|\n" +
+    "B|------------------------3-------|------------------------3-------|\n" +
+    "G|--------------------------------|--------------------------------|\n" +
+    "D|--------------------------------|--------------------------------|\n" +
+    "A|--------------------------------|--------------------------------|\n" +
+    "E|--------------------------------|--------------------------------|\n" +
+    "\n" +
+    "e|--------3---3---5---5---3-------|1---1---0---0-------------------|\n" +
+    "B|1---1---------------------------|----------------3---3---1-------|\n" +
+    "G|--------------------------------|--------------------------------|\n" +
+    "D|--------------------------------|--------------------------------|\n" +
+    "A|--------------------------------|--------------------------------|\n" +
+    "E|--------------------------------|--------------------------------|\n";
+
+  var STRING_NAMES = ["e", "B", "G", "D", "A", "E"];
+  var STORE_KEY = "guitar-tab-viewer.tab";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var scroller = $("scroller"), stage = $("stage"), tabSvg = $("tabSvg");
+  var playhead = $("playhead"), labels = $("labels"), posReadout = $("posReadout");
+  var loopRegion = $("loopRegion"), loopStatus = $("loopStatus");
+  var playBtn = $("playBtn");
+
+  var rows = [];          // 6 strings of equal-length text
+  var totalCols = 0;
+  var barCols = [];       // column indices of barlines
+  var pos = 0;            // playhead position in columns (float)
+  var playing = false;
+  var lastT = 0;
+  var lastBeat = -1;
+  var rafId = 0;
+  var audioCtx = null;
+  var loopA = null, loopB = null;
+
+  // layout metrics, recomputed from the zoom slider in render()
+  var colW = 15, padLeft = 14, lineYs = [], svgH = 0;
+
+  // ---- parsing --------------------------------------------------------
+
+  function looksLikeTabLine(line) {
+    var s = line.replace(/\s+$/, "");
+    if ((s.match(/-/g) || []).length < 3) return false;
+    var body = s.replace(/^\s*[A-Ga-g]?[#b]?\s*(?=\|)/, "");
+    var ok = (body.match(/[-|0-9hpbrsxX\/\\~^*.()<>= ]/g) || []).length;
+    return body.length > 0 && ok / body.length >= 0.85;
+  }
+
+  function stripLabel(line) {
+    // remove leading string name ("e", "B", "D#"...) but keep the barline
+    return line.replace(/\s+$/, "").replace(/^\s*[A-Ga-g][#b]?\s*(?=\|)/, "").replace(/^\s+/, "");
+  }
+
+  function parseTab(text) {
+    var lines = text.split(/\r?\n/);
+    var groups = [], cur = [];
+    for (var i = 0; i < lines.length; i++) {
+      if (looksLikeTabLine(lines[i])) {
+        cur.push(lines[i]);
+      } else if (cur.length) {
+        groups.push(cur); cur = [];
+      }
+    }
+    if (cur.length) groups.push(cur);
+
+    var out = ["", "", "", "", "", ""];
+    var systems = 0;
+    for (var g = 0; g < groups.length; g++) {
+      for (var s = 0; s + 6 <= groups[g].length; s += 6) {
+        var sys = [], maxLen = 0, k;
+        for (k = 0; k < 6; k++) {
+          var content = stripLabel(groups[g][s + k]);
+          sys.push(content);
+          maxLen = Math.max(maxLen, content.length);
+        }
+        for (k = 0; k < 6; k++) {
+          while (sys[k].length < maxLen) sys[k] += "-";
+          out[k] += sys[k];
+        }
+        systems++;
+      }
+    }
+    if (!systems) return null;
+    return { rows: out, systems: systems };
+  }
+
+  function findBarCols() {
+    barCols = [];
+    for (var c = 0; c < totalCols; c++) {
+      var n = 0;
+      for (var i = 0; i < 6; i++) if (rows[i].charAt(c) === "|") n++;
+      if (n >= 4) barCols.push(c);
+    }
+  }
+
+  // ---- SVG rendering --------------------------------------------------
+
+  function render() {
+    var Z = parseInt($("zoom").value, 10);
+    colW = Z * 0.62;
+    var lineGap = Z * 1.5;
+    var padTop = Z * 1.1;
+    svgH = Math.round(padTop * 2 + lineGap * 5);
+    var svgW = Math.round(padLeft + totalCols * colW + 30);
+
+    lineYs = [];
+    var parts = [], i, c;
+
+    for (i = 0; i < 6; i++) {
+      var y = Math.round(padTop + i * lineGap) + 0.5;
+      lineYs.push(y);
+      parts.push('<line class="sv-line" x1="0" y1="' + y + '" x2="' + svgW + '" y2="' + y + '"/>');
+    }
+    for (i = 0; i < barCols.length; i++) {
+      var bx = (padLeft + (barCols[i] + 0.5) * colW).toFixed(1);
+      parts.push('<line class="sv-bar" x1="' + bx + '" y1="' + lineYs[0] + '" x2="' + bx + '" y2="' + lineYs[5] + '"/>');
+    }
+
+    var noteFont = (Z * 0.92).toFixed(1);
+    var techFont = (Z * 0.62).toFixed(1);
+    var noteRe = /\d+/g, m;
+    for (i = 0; i < 6; i++) {
+      var row = rows[i];
+      // fret numbers with a rounded plate behind them
+      noteRe.lastIndex = 0;
+      while ((m = noteRe.exec(row)) !== null) {
+        var cx = padLeft + (m.index + m[0].length / 2) * colW;
+        var w = m[0].length * Z * 0.62 + Z * 0.34;
+        var h = Z * 1.12;
+        parts.push('<rect class="sv-notebg" x="' + (cx - w / 2).toFixed(1) + '" y="' + (lineYs[i] - h / 2).toFixed(1) +
+          '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + (Z * 0.18).toFixed(1) + '"/>');
+        parts.push('<text class="sv-note" x="' + cx.toFixed(1) + '" y="' + lineYs[i] +
+          '" font-size="' + noteFont + '" text-anchor="middle" dominant-baseline="central">' + m[0] + "</text>");
+      }
+      // technique marks: h p / \ ~ b r x etc.
+      for (c = 0; c < row.length; c++) {
+        var ch = row.charAt(c);
+        if (ch === "-" || ch === "|" || ch === " " || (ch >= "0" && ch <= "9")) continue;
+        var tx = padLeft + (c + 0.5) * colW;
+        parts.push('<text class="sv-tech" x="' + tx.toFixed(1) + '" y="' + (lineYs[i] - Z * 0.15).toFixed(1) +
+          '" font-size="' + techFont + '" text-anchor="middle" dominant-baseline="central">' +
+          ch.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</text>");
+      }
+    }
+
+    tabSvg.setAttribute("width", svgW);
+    tabSvg.setAttribute("height", svgH);
+    tabSvg.setAttribute("viewBox", "0 0 " + svgW + " " + svgH);
+    tabSvg.innerHTML = parts.join("");
+
+    labels.innerHTML = STRING_NAMES
+      .map(function (n, k) {
+        return '<span style="top:' + lineYs[k] + 'px;font-size:' + (Z * 0.68).toFixed(1) + 'px">' + n + "</span>";
+      })
+      .join("");
+
+    updateLoopUI();
+    updateView(true);
+  }
+
+  function playheadX() { return padLeft + pos * colW; }
+
+  function measureOf(col) {
+    var n = 0;
+    for (var i = 0; i < barCols.length; i++) if (barCols[i] < col) n++;
+    return n + 1;
+  }
+
+  function totalMeasures() {
+    if (!barCols.length) return 0;
+    // a trailing barline closes the last measure instead of opening a new one
+    return barCols[barCols.length - 1] >= totalCols - 2 ? barCols.length : barCols.length + 1;
+  }
+
+  function updateView(forceScroll) {
+    var x = playheadX();
+    playhead.style.transform = "translateX(" + x + "px)";
+    var anchor = Math.min(scroller.clientWidth * 0.32, 320);
+    var target = Math.max(0, x - anchor);
+    if (playing || forceScroll) scroller.scrollLeft = target;
+    if (totalCols > 0) {
+      var text = Math.min(totalCols, Math.floor(pos) + 1) + " / " + totalCols + " 列";
+      var tm = totalMeasures();
+      if (tm) text = Math.min(tm, measureOf(pos)) + " / " + tm + " 小節 · " + text;
+      posReadout.textContent = text;
+    } else {
+      posReadout.textContent = "";
+    }
+  }
+
+  // ---- A-B loop -------------------------------------------------------
+
+  function updateLoopUI() {
+    var hasLoop = loopA !== null && loopB !== null;
+    loopRegion.hidden = !hasLoop;
+    if (hasLoop) {
+      loopRegion.style.left = (padLeft + loopA * colW) + "px";
+      loopRegion.style.width = ((loopB - loopA) * colW) + "px";
+    }
+    $("loopABtn").classList.toggle("loop-on", loopA !== null);
+    $("loopBBtn").classList.toggle("loop-on", loopB !== null);
+    if (loopA === null && loopB === null) {
+      loopStatus.textContent = "未設定";
+    } else {
+      loopStatus.textContent =
+        "A:" + (loopA === null ? "–" : loopA + 1) + " B:" + (loopB === null ? "–" : loopB + 1);
+    }
+  }
+
+  function setLoopA() {
+    loopA = Math.max(0, Math.floor(pos));
+    if (loopB !== null && loopB <= loopA) loopB = null;
+    updateLoopUI();
+  }
+
+  function setLoopB() {
+    var b = Math.min(totalCols, Math.ceil(pos));
+    if (loopA === null) loopA = 0;
+    if (b <= loopA) return;
+    loopB = b;
+    updateLoopUI();
+  }
+
+  function clearLoop() {
+    loopA = loopB = null;
+    updateLoopUI();
+  }
+
+  // ---- playback -------------------------------------------------------
+
+  function colsPerBeat() { return parseInt($("res").value, 10); }
+  function colsPerSec() { return ($("bpm").value / 60) * colsPerBeat(); }
+
+  function click(accent) {
+    if (!$("metro").checked) return;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.frequency.value = accent ? 1568 : 1047;
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.07);
+  }
+
+  function tick(t) {
+    if (!playing) return;
+    if (lastT) {
+      pos += colsPerSec() * (t - lastT) / 1000;
+      if (loopA !== null && loopB !== null && pos >= loopB) {
+        pos = loopA;
+        lastBeat = Math.floor(pos / colsPerBeat()) - 1;
+      }
+      var beat = Math.floor(pos / colsPerBeat());
+      if (beat !== lastBeat) { click(beat % 4 === 0); lastBeat = beat; }
+      if (pos >= totalCols) { pos = totalCols; setPlaying(false); }
+      updateView(false);
+    }
+    lastT = t;
+    if (playing) rafId = requestAnimationFrame(tick);
+  }
+
+  function setPlaying(on) {
+    playing = on;
+    playBtn.textContent = on ? "⏸ 停止" : "▶ 再生";
+    lastT = 0;
+    if (on) {
+      if (pos >= totalCols) pos = loopA !== null ? loopA : 0;
+      lastBeat = Math.floor(pos / colsPerBeat()) - 1;
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      rafId = requestAnimationFrame(tick);
+    } else {
+      cancelAnimationFrame(rafId);
+      updateView(false);
+    }
+  }
+
+  // ---- load / save ----------------------------------------------------
+
+  function loadTab(text, sourceLabel) {
+    var parsed = parseTab(text);
+    var msg = $("parseMsg");
+    if (!parsed) {
+      msg.textContent = "タブ譜を読み取れませんでした。6行1組(各弦1行)の形式か確認してください。";
+      return false;
+    }
+    rows = parsed.rows;
+    totalCols = rows[0].length;
+    findBarCols();
+    pos = 0;
+    clearLoop();
+    setPlaying(false);
+    render();
+    msg.textContent = (sourceLabel ? sourceLabel + " から " : "") +
+      parsed.systems + "段のタブ譜を読み込みました(全" + totalCols + "列)。";
+    try { localStorage.setItem(STORE_KEY, text); } catch (e) { /* private mode etc. */ }
+    return true;
+  }
+
+  function guessTitle() {
+    var lines = $("tabInput").value.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var s = lines[i].trim();
+      if (s && !looksLikeTabLine(lines[i])) {
+        return s.replace(/[\\\/:*?"<>|]/g, "").slice(0, 40);
+      }
+    }
+    return "";
+  }
+
+  function saveFile() {
+    var blob = new Blob([$("tabInput").value], { type: "text/plain;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (guessTitle() || "guitar-tab") + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    $("parseMsg").textContent = "「" + a.download + "」として保存しました。";
+  }
+
+  // ---- wiring ---------------------------------------------------------
+
+  playBtn.addEventListener("click", function () { setPlaying(!playing); });
+  $("rewindBtn").addEventListener("click", function () {
+    pos = loopA !== null ? loopA : 0;
+    updateView(true);
+  });
+
+  $("bpm").addEventListener("input", function () { $("bpmOut").textContent = this.value; });
+  $("zoom").addEventListener("input", function () {
+    $("zoomOut").textContent = this.value;
+    render();
+  });
+
+  $("loopABtn").addEventListener("click", setLoopA);
+  $("loopBBtn").addEventListener("click", setLoopB);
+  $("loopClearBtn").addEventListener("click", clearLoop);
+
+  scroller.addEventListener("click", function (e) {
+    var rect = stage.getBoundingClientRect();
+    var col = (e.clientX - rect.left - padLeft) / colW;
+    pos = Math.max(0, Math.min(totalCols, col));
+    lastBeat = Math.floor(pos / colsPerBeat()) - 1;
+    updateView(false);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.code === "Space") { e.preventDefault(); setPlaying(!playing); }
+    else if (e.code === "ArrowRight") { pos = Math.min(totalCols, pos + colsPerBeat() * 2); updateView(true); }
+    else if (e.code === "ArrowLeft") { pos = Math.max(0, pos - colsPerBeat() * 2); updateView(true); }
+    else if (e.code === "Home") { pos = 0; updateView(true); }
+    else if (e.code === "KeyA") { setLoopA(); }
+    else if (e.code === "KeyB") { setLoopB(); }
+    else if (e.code === "Escape") { clearLoop(); }
+  });
+
+  $("loadBtn").addEventListener("click", function () {
+    loadTab($("tabInput").value);
+  });
+
+  $("saveBtn").addEventListener("click", saveFile);
+  $("openBtn").addEventListener("click", function () { $("fileInput").click(); });
+  $("fileInput").addEventListener("change", function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      $("tabInput").value = reader.result;
+      loadTab(reader.result, "「" + file.name + "」");
+    };
+    reader.readAsText(file);
+    this.value = "";
+  });
+
+  // ---- init -----------------------------------------------------------
+
+  var initialText = SAMPLE;
+  try {
+    var saved = localStorage.getItem(STORE_KEY);
+    if (saved && parseTab(saved)) initialText = saved;
+  } catch (e) { /* storage unavailable */ }
+  $("tabInput").value = initialText;
+  var initial = parseTab(initialText);
+  rows = initial.rows;
+  totalCols = rows[0].length;
+  findBarCols();
+  render();
+  window.addEventListener("resize", function () { updateView(false); });
+})();
+</script>
+
+</body>
+</html>
