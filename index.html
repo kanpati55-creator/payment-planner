@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ギターの相棒 — チューナー & コード検索</title>
+<style>
+  :root {
+    --bg: #12151c;
+    --panel: #1c212c;
+    --panel2: #232a38;
+    --line: #323b4d;
+    --text: #e8ecf3;
+    --muted: #8b95a7;
+    --accent: #f5a623;
+    --accent-dim: #a8721a;
+    --good: #3ecf8e;
+    --bad: #f06060;
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    text-align: center;
+    padding: 20px 16px 8px;
+  }
+  header h1 { font-size: 1.35rem; letter-spacing: .04em; }
+  header h1 .g { color: var(--accent); }
+  header p { color: var(--muted); font-size: .8rem; margin-top: 4px; }
+
+  .tabs {
+    display: flex;
+    max-width: 560px;
+    margin: 14px auto 0;
+    padding: 0 16px;
+    gap: 8px;
+  }
+  .tab {
+    flex: 1;
+    padding: 12px 0;
+    text-align: center;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border-bottom: none;
+    color: var(--muted);
+    font-size: .95rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tab.active { background: var(--panel2); color: var(--accent); }
+
+  main {
+    max-width: 560px;
+    margin: 0 auto 40px;
+    padding: 0 16px;
+  }
+  .page {
+    display: none;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 20px 16px 24px;
+  }
+  .page.active { display: block; }
+
+  /* ---------- tuner ---------- */
+  .big-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1408;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .big-btn.stop { background: var(--bad); color: #fff; }
+  .big-btn:disabled { opacity: .5; }
+
+  .note-display {
+    text-align: center;
+    margin: 18px 0 6px;
+  }
+  .note-display .note {
+    font-size: 4.2rem;
+    font-weight: 800;
+    line-height: 1;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  .note-display .note.intune { color: var(--good); }
+  .note-display .freq { color: var(--muted); font-size: .9rem; margin-top: 6px; }
+
+  .gauge-wrap { margin: 14px 0 4px; }
+  .gauge {
+    position: relative;
+    height: 56px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .gauge .center-line {
+    position: absolute; left: 50%; top: 0; bottom: 0;
+    width: 2px; background: var(--good); transform: translateX(-1px);
+  }
+  .gauge .zone {
+    position: absolute; left: 50%; top: 0; bottom: 0;
+    width: 12%; transform: translateX(-50%);
+    background: rgba(62, 207, 142, .12);
+  }
+  .gauge .needle {
+    position: absolute; top: 6px; bottom: 6px;
+    width: 4px; border-radius: 2px;
+    background: var(--accent);
+    left: 50%;
+    transition: left .08s linear, background .2s;
+  }
+  .gauge .needle.intune { background: var(--good); }
+  .gauge-labels {
+    display: flex; justify-content: space-between;
+    color: var(--muted); font-size: .72rem; margin-top: 4px;
+  }
+  .tune-advice {
+    text-align: center;
+    min-height: 1.6em;
+    font-size: .95rem;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .tune-advice.flat { color: var(--accent); }
+  .tune-advice.sharp { color: var(--bad); }
+  .tune-advice.ok { color: var(--good); }
+
+  .section-title {
+    color: var(--muted);
+    font-size: .78rem;
+    letter-spacing: .1em;
+    margin: 22px 0 10px;
+  }
+  .strings {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+  .string-btn {
+    padding: 10px 0 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+  }
+  .string-btn .n { font-size: 1.05rem; font-weight: 700; display: block; }
+  .string-btn .s { font-size: .68rem; color: var(--muted); display: block; margin-top: 2px; }
+  .string-btn.near { border-color: var(--accent); background: rgba(245, 166, 35, .12); }
+  .string-btn:active { background: var(--panel2); }
+  .hint { color: var(--muted); font-size: .78rem; margin-top: 14px; line-height: 1.7; }
+
+  /* ---------- chords ---------- */
+  .picker-label { color: var(--muted); font-size: .78rem; letter-spacing: .1em; margin-bottom: 8px; }
+  .roots {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .roots button, .quals button {
+    padding: 10px 4px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: .92rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .roots button.sel, .quals button.sel {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1a1408;
+  }
+  .quals {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .quals button { font-size: .8rem; padding: 9px 2px; }
+
+  .chord-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 4px 0 4px;
+  }
+  .chord-header .name { font-size: 2rem; font-weight: 800; color: var(--accent); }
+  .chord-header .notes-in { color: var(--muted); font-size: .85rem; }
+
+  .voicings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 12px;
+    justify-content: flex-start;
+  }
+  .voicing {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 10px 10px;
+    text-align: center;
+    flex: 0 0 auto;
+  }
+  .voicing .vlabel { font-size: .75rem; color: var(--muted); margin-bottom: 6px; }
+  .voicing svg { display: block; }
+  .play-btn {
+    margin-top: 8px;
+    padding: 6px 18px;
+    font-size: .8rem;
+    font-weight: 700;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .play-btn:active { background: rgba(245,166,35,.15); }
+  .empty-msg { color: var(--muted); font-size: .9rem; padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎸 ギターの<span class="g">相棒</span></h1>
+  <p>アコギのチューニングとコードの押さえ方をすぐに確認</p>
+</header>
+
+<div class="tabs">
+  <div class="tab active" id="tabTuner">チューナー</div>
+  <div class="tab" id="tabChords">コード検索</div>
+</div>
+
+<main>
+  <!-- ================= TUNER ================= -->
+  <section class="page active" id="pageTuner">
+    <button class="big-btn" id="tunerToggle">🎤 チューニング開始</button>
+
+    <div class="note-display">
+      <div class="note" id="noteName">—</div>
+      <div class="freq" id="freqText">マイクの使用を許可してください</div>
+    </div>
+
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <div class="zone"></div>
+        <div class="center-line"></div>
+        <div class="needle" id="needle"></div>
+      </div>
+      <div class="gauge-labels"><span>低い ♭</span><span>ぴったり</span><span>高い ♯</span></div>
+    </div>
+    <div class="tune-advice" id="advice"></div>
+
+    <div class="section-title">基準音を鳴らす（レギュラーチューニング）</div>
+    <div class="strings" id="stringBtns"></div>
+
+    <p class="hint">
+      💡 使い方：「チューニング開始」を押してマイクを許可し、弦を1本ずつ鳴らします。
+      針が中央の緑ゾーンに入れば OK。左（低い）ならペグを巻いて音を上げ、右（高い）なら緩めます。
+      静かな場所でギターをマイクに近づけると精度が上がります。
+    </p>
+  </section>
+
+  <!-- ================= CHORDS ================= -->
+  <section class="page" id="pageChords">
+    <div class="picker-label">ルート音（コードの頭文字）</div>
+    <div class="roots" id="rootBtns"></div>
+
+    <div class="picker-label">コードタイプ</div>
+    <div class="quals" id="qualBtns"></div>
+
+    <div class="chord-header">
+      <span class="name" id="chordName"></span>
+      <span class="notes-in" id="chordNotes"></span>
+    </div>
+    <div class="voicings" id="voicings"></div>
+
+    <p class="hint">
+      💡 ダイアグラムの見方：縦線が弦（左が6弦・低いミ）、横線がフレット。
+      ●が押さえる場所、○は開放弦（押さえずに鳴らす）、×は鳴らさない弦。
+      左端の数字はフレット位置（表示がなければ1フレットから）。「♪ 鳴らす」で実際の響きを確認できます。
+    </p>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* ==============================
+   共通：音の定義
+============================== */
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+// レギュラーチューニング：6弦→1弦（MIDIノート番号）
+const GUITAR_STRINGS = [
+  { name: "E", octave: 2, midi: 40, label: "6弦" },
+  { name: "A", octave: 2, midi: 45, label: "5弦" },
+  { name: "D", octave: 3, midi: 50, label: "4弦" },
+  { name: "G", octave: 3, midi: 55, label: "3弦" },
+  { name: "B", octave: 3, midi: 59, label: "2弦" },
+  { name: "E", octave: 4, midi: 64, label: "1弦" },
+];
+const midiToFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+/* 弦をはじいたような音を1音鳴らす */
+function pluck(freq, when = 0, dur = 1.6, gainVal = 0.22) {
+  const ctx = getAudioCtx();
+  const t0 = ctx.currentTime + when;
+  const osc = ctx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.value = freq;
+  const osc2 = ctx.createOscillator();
+  osc2.type = "sine";
+  osc2.frequency.value = freq * 2;
+  const g = ctx.createGain();
+  const g2 = ctx.createGain();
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(Math.min(freq * 6, 4000), t0);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.5, 300), t0 + dur);
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(gainVal, t0 + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  g2.gain.setValueAtTime(0, t0);
+  g2.gain.linearRampToValueAtTime(gainVal * 0.25, t0 + 0.008);
+  g2.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.6);
+  osc.connect(g); osc2.connect(g2);
+  g.connect(lp); g2.connect(lp);
+  lp.connect(ctx.destination);
+  osc.start(t0); osc2.start(t0);
+  osc.stop(t0 + dur + 0.1); osc2.stop(t0 + dur + 0.1);
+}
+
+/* ==============================
+   タブ切り替え
+============================== */
+const tabTuner = document.getElementById("tabTuner");
+const tabChords = document.getElementById("tabChords");
+const pageTuner = document.getElementById("pageTuner");
+const pageChords = document.getElementById("pageChords");
+function showTab(which) {
+  const tunerOn = which === "tuner";
+  tabTuner.classList.toggle("active", tunerOn);
+  tabChords.classList.toggle("active", !tunerOn);
+  pageTuner.classList.toggle("active", tunerOn);
+  pageChords.classList.toggle("active", !tunerOn);
+}
+tabTuner.onclick = () => showTab("tuner");
+tabChords.onclick = () => showTab("chords");
+
+/* ==============================
+   チューナー
+============================== */
+const toggleBtn = document.getElementById("tunerToggle");
+const noteNameEl = document.getElementById("noteName");
+const freqTextEl = document.getElementById("freqText");
+const needleEl = document.getElementById("needle");
+const adviceEl = document.getElementById("advice");
+const stringBtnsEl = document.getElementById("stringBtns");
+
+let micStream = null, analyser = null, rafId = null;
+const bufLen = 4096;
+const timeBuf = new Float32Array(bufLen);
+let centsHistory = [];
+
+GUITAR_STRINGS.forEach((s, i) => {
+  const b = document.createElement("button");
+  b.className = "string-btn";
+  b.id = "strBtn" + i;
+  b.innerHTML = `<span class="n">${s.name}${s.octave}</span><span class="s">${s.label}</span>`;
+  b.onclick = () => pluck(midiToFreq(s.midi), 0, 2.2, 0.28);
+  stringBtnsEl.appendChild(b);
+});
+
+toggleBtn.onclick = async () => {
+  if (micStream) { stopTuner(); return; }
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch (e) {
+    freqTextEl.textContent = "マイクを使用できません。ブラウザの許可設定を確認してください。";
+    return;
+  }
+  const ctx = getAudioCtx();
+  const src = ctx.createMediaStreamSource(micStream);
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = bufLen;
+  src.connect(analyser);
+  toggleBtn.textContent = "■ 停止";
+  toggleBtn.classList.add("stop");
+  freqTextEl.textContent = "弦を鳴らしてください…";
+  loop();
+};
+
+function stopTuner() {
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  micStream = null; analyser = null;
+  toggleBtn.textContent = "🎤 チューニング開始";
+  toggleBtn.classList.remove("stop");
+  noteNameEl.textContent = "—";
+  noteNameEl.classList.remove("intune");
+  freqTextEl.textContent = "停止中";
+  adviceEl.textContent = "";
+  adviceEl.className = "tune-advice";
+  needleEl.style.left = "50%";
+  needleEl.classList.remove("intune");
+  GUITAR_STRINGS.forEach((_, i) => document.getElementById("strBtn" + i).classList.remove("near"));
+}
+
+/* 自己相関によるピッチ検出 */
+function autoCorrelate(buf, sampleRate) {
+  let rms = 0;
+  for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / buf.length);
+  if (rms < 0.008) return -1; // 無音
+
+  let r1 = 0, r2 = buf.length - 1;
+  const thres = 0.2;
+  for (let i = 0; i < buf.length / 2; i++) { if (Math.abs(buf[i]) < thres) { r1 = i; break; } }
+  for (let i = 1; i < buf.length / 2; i++) { if (Math.abs(buf[buf.length - i]) < thres) { r2 = buf.length - i; break; } }
+  const b = buf.slice(r1, r2);
+  const n = b.length;
+  if (n < 64) return -1;
+
+  const c = new Float32Array(n);
+  for (let lag = 0; lag < n; lag++) {
+    let sum = 0;
+    for (let i = 0; i < n - lag; i++) sum += b[i] * b[i + lag];
+    c[lag] = sum;
+  }
+  let d = 0;
+  while (d < n - 1 && c[d] > c[d + 1]) d++;
+  let maxval = -1, maxpos = -1;
+  for (let i = d; i < n; i++) {
+    if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+  }
+  if (maxpos <= 0) return -1;
+  let T0 = maxpos;
+  // 放物線補間で精度を上げる
+  const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1] || x2;
+  const a = (x1 + x3 - 2 * x2) / 2, bb = (x3 - x1) / 2;
+  if (a) T0 = T0 - bb / (2 * a);
+  const freq = sampleRate / T0;
+  if (freq < 60 || freq > 1200) return -1;
+  return freq;
+}
+
+function loop() {
+  rafId = requestAnimationFrame(loop);
+  if (!analyser) return;
+  analyser.getFloatTimeDomainData(timeBuf);
+  const freq = autoCorrelate(timeBuf, getAudioCtx().sampleRate);
+
+  if (freq < 0) {
+    centsHistory = [];
+    freqTextEl.textContent = "弦を鳴らしてください…";
+    return;
+  }
+  const midiFloat = 69 + 12 * Math.log2(freq / 440);
+  const midi = Math.round(midiFloat);
+  let cents = (midiFloat - midi) * 100;
+
+  centsHistory.push(cents);
+  if (centsHistory.length > 5) centsHistory.shift();
+  cents = centsHistory.reduce((a, b) => a + b, 0) / centsHistory.length;
+
+  const name = NOTE_NAMES[(midi % 12 + 12) % 12];
+  const oct = Math.floor(midi / 12) - 1;
+  noteNameEl.textContent = name + oct;
+  freqTextEl.textContent = freq.toFixed(1) + " Hz";
+
+  // 針：±50セントを左右いっぱいにマッピング
+  const pos = 50 + Math.max(-50, Math.min(50, cents));
+  needleEl.style.left = pos + "%";
+
+  const inTune = Math.abs(cents) < 6;
+  needleEl.classList.toggle("intune", inTune);
+  noteNameEl.classList.toggle("intune", inTune);
+
+  // 一番近い弦をハイライト
+  let nearest = 0, best = 1e9;
+  GUITAR_STRINGS.forEach((s, i) => {
+    const d = Math.abs(midiFloat - s.midi);
+    if (d < best) { best = d; nearest = i; }
+  });
+  GUITAR_STRINGS.forEach((_, i) =>
+    document.getElementById("strBtn" + i).classList.toggle("near", i === nearest && best < 2.5));
+
+  if (inTune) {
+    adviceEl.textContent = "✓ ぴったり！";
+    adviceEl.className = "tune-advice ok";
+  } else if (cents < 0) {
+    adviceEl.textContent = "低い → ペグを巻いて音を上げる";
+    adviceEl.className = "tune-advice flat";
+  } else {
+    adviceEl.textContent = "高い → ペグを緩めて音を下げる";
+    adviceEl.className = "tune-advice sharp";
+  }
+}
+
+/* ==============================
+   コード検索
+============================== */
+const QUALITIES = [
+  { key: "",     label: "メジャー", intervals: [0,4,7] },
+  { key: "m",    label: "m",       intervals: [0,3,7] },
+  { key: "7",    label: "7",       intervals: [0,4,7,10] },
+  { key: "m7",   label: "m7",      intervals: [0,3,7,10] },
+  { key: "maj7", label: "maj7",    intervals: [0,4,7,11] },
+  { key: "6",    label: "6",       intervals: [0,4,7,9] },
+  { key: "m6",   label: "m6",      intervals: [0,3,7,9] },
+  { key: "sus4", label: "sus4",    intervals: [0,5,7] },
+  { key: "sus2", label: "sus2",    intervals: [0,2,7] },
+  { key: "7sus4",label: "7sus4",   intervals: [0,5,7,10] },
+  { key: "add9", label: "add9",    intervals: [0,4,7,14] },
+  { key: "9",    label: "9",       intervals: [0,4,7,10,14] },
+  { key: "m9",   label: "m9",      intervals: [0,3,7,10,14] },
+  { key: "mM7",  label: "mM7",     intervals: [0,3,7,11] },
+  { key: "dim",  label: "dim",     intervals: [0,3,6] },
+  { key: "dim7", label: "dim7",    intervals: [0,3,6,9] },
+  { key: "m7b5", label: "m7♭5",    intervals: [0,3,6,10] },
+  { key: "aug",  label: "aug",     intervals: [0,4,8] },
+  { key: "5",    label: "5(パワー)", intervals: [0,7] },
+];
+
+/*
+  セーハ（バレー）フォーム：バレー位置 f に対する相対フレット
+  root: 6 = 6弦ルート（Eフォーム）, 5 = 5弦ルート（Aフォーム）
+  配列は 6弦→1弦。null はミュート。
+*/
+const BARRE_FORMS = {
+  "":      [ { root: 6, rel: [0,2,2,1,0,0] },      { root: 5, rel: [null,0,2,2,2,0] } ],
+  "m":     [ { root: 6, rel: [0,2,2,0,0,0] },      { root: 5, rel: [null,0,2,2,1,0] } ],
+  "7":     [ { root: 6, rel: [0,2,0,1,0,0] },      { root: 5, rel: [null,0,2,0,2,0] } ],
+  "m7":    [ { root: 6, rel: [0,2,0,0,0,0] },      { root: 5, rel: [null,0,2,0,1,0] } ],
+  "maj7":  [ { root: 6, rel: [0,2,1,1,0,0] },      { root: 5, rel: [null,0,2,1,2,0] } ],
+  "6":     [ { root: 6, rel: [0,2,2,1,2,0] },      { root: 5, rel: [null,0,2,2,2,2] } ],
+  "m6":    [ { root: 6, rel: [0,2,2,0,2,0] },      { root: 5, rel: [null,0,2,2,1,2] } ],
+  "sus4":  [ { root: 6, rel: [0,2,2,2,0,0] },      { root: 5, rel: [null,0,2,2,3,0] } ],
+  "sus2":  [ { root: 5, rel: [null,0,2,2,0,0] } ],
+  "7sus4": [ { root: 6, rel: [0,2,0,2,0,0] },      { root: 5, rel: [null,0,2,0,3,0] } ],
+  "add9":  [ { root: 6, rel: [0,2,2,1,0,2] },      { root: 5, rel: [null,0,2,4,2,0] } ],
+  "9":     [ { root: 6, rel: [0,2,0,1,0,2] },      { root: 5, rel: [null,2,1,2,2,2], shift: -2 } ],
+  "m9":    [ { root: 6, rel: [0,2,0,0,0,2] } ],
+  "mM7":   [ { root: 5, rel: [null,0,2,1,1,0] },   { root: 6, rel: [0,2,1,0,0,0] } ],
+  "dim":   [ { root: 5, rel: [null,0,1,2,1,null] } ],
+  "dim7":  [ { root: 5, rel: [null,0,1,2,1,2] } ],
+  "m7b5":  [ { root: 5, rel: [null,0,1,0,1,null] } ],
+  "aug":   [ { root: 5, rel: [null,0,3,2,2,null] } ],
+  "5":     [ { root: 6, rel: [0,2,2,null,null,null] }, { root: 5, rel: [null,0,2,2,null,null] } ],
+};
+
+/* よく使うオープンコードの定番の押さえ方（6弦→1弦、-1=ミュート、0=開放） */
+const OPEN_CHORDS = {
+  "C":     [-1,3,2,0,1,0],
+  "A":     [-1,0,2,2,2,0],
+  "G":     [3,2,0,0,0,3],
+  "E":     [0,2,2,1,0,0],
+  "D":     [-1,-1,0,2,3,2],
+  "Am":    [-1,0,2,2,1,0],
+  "Em":    [0,2,2,0,0,0],
+  "Dm":    [-1,-1,0,2,3,1],
+  "A7":    [-1,0,2,0,2,0],
+  "B7":    [-1,2,1,2,0,2],
+  "C7":    [-1,3,2,3,1,0],
+  "D7":    [-1,-1,0,2,1,2],
+  "E7":    [0,2,0,1,0,0],
+  "G7":    [3,2,0,0,0,1],
+  "Cmaj7": [-1,3,2,0,0,0],
+  "Dmaj7": [-1,-1,0,2,2,2],
+  "Amaj7": [-1,0,2,1,2,0],
+  "Emaj7": [0,2,1,1,0,0],
+  "Fmaj7": [-1,-1,3,2,1,0],
+  "Gmaj7": [3,2,0,0,0,2],
+  "Am7":   [-1,0,2,0,1,0],
+  "Dm7":   [-1,-1,0,2,1,1],
+  "Em7":   [0,2,0,0,0,0],
+  "Cadd9": [-1,3,2,0,3,0],
+  "Dsus4": [-1,-1,0,2,3,3],
+  "Asus4": [-1,0,2,2,3,0],
+  "Esus4": [0,2,2,2,0,0],
+  "Dsus2": [-1,-1,0,2,3,0],
+  "Asus2": [-1,0,2,2,0,0],
+};
+
+let selRoot = 0;   // C
+let selQual = 0;   // メジャー
+
+const rootBtnsEl = document.getElementById("rootBtns");
+const qualBtnsEl = document.getElementById("qualBtns");
+
+NOTE_NAMES.forEach((n, i) => {
+  const b = document.createElement("button");
+  b.textContent = n;
+  b.onclick = () => { selRoot = i; renderPickers(); renderChord(); };
+  rootBtnsEl.appendChild(b);
+});
+QUALITIES.forEach((q, i) => {
+  const b = document.createElement("button");
+  b.textContent = q.label;
+  b.onclick = () => { selQual = i; renderPickers(); renderChord(); };
+  qualBtnsEl.appendChild(b);
+});
+
+function renderPickers() {
+  [...rootBtnsEl.children].forEach((b, i) => b.classList.toggle("sel", i === selRoot));
+  [...qualBtnsEl.children].forEach((b, i) => b.classList.toggle("sel", i === selQual));
+}
+
+/* 指定コードのボイシング（押さえ方）一覧を作る */
+function buildVoicings(rootIdx, quality) {
+  const list = [];
+  const openKey = NOTE_NAMES[rootIdx] + quality.key;
+  if (OPEN_CHORDS[openKey]) {
+    list.push({ label: "オープンコード", frets: OPEN_CHORDS[openKey].slice() });
+  }
+  const forms = BARRE_FORMS[quality.key] || [];
+  for (const form of forms) {
+    const openStringNote = form.root === 6 ? 4 : 9; // E or A
+    const rootFret = ((rootIdx - openStringNote) % 12 + 12) % 12;
+    let f = rootFret;
+    if (form.shift) {
+      f += form.shift;
+      if (f < 0) f += 12;
+    }
+    const frets = form.rel.map(v => (v === null ? -1 : v + f));
+    if (Math.max(...frets) > 15) continue; // ハイポジションすぎる形は省く
+    // オープンコードと同じ形なら重複させない
+    const dup = list.some(v => v.frets.join(",") === frets.join(","));
+    if (dup) continue;
+    const rootStr = form.root === 6 ? "6弦" : "5弦";
+    const label = rootFret === 0
+      ? "ローポジション"
+      : `${rootStr}ルート・${rootFret}フレット`;
+    list.push({ label, frets });
+    if (list.length >= 3) break;
+  }
+  return list;
+}
+
+/* コードダイアグラムを SVG で描画 */
+function drawDiagram(frets) {
+  const numStrings = 6, numFrets = 4;
+  const pressed = frets.filter(v => v > 0);
+  const minF = pressed.length ? Math.min(...pressed) : 1;
+  const maxF = pressed.length ? Math.max(...pressed) : 1;
+  let baseFret = 1;
+  if (maxF > numFrets) baseFret = minF;
+  const span = Math.max(numFrets, maxF - baseFret + 1);
+
+  const W = 150, H = 170;
+  const left = 30, top = 34, right = 128;
+  const fretH = (H - top - 14) / span;
+  const stringGap = (right - left) / (numStrings - 1);
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // ナット or フレット位置表示
+  if (baseFret === 1) {
+    s += `<rect x="${left - 1.5}" y="${top - 5}" width="${right - left + 3}" height="5" rx="1.5" fill="#e8ecf3"/>`;
+  } else {
+    s += `<text x="${left - 10}" y="${top + fretH * 0.65}" font-size="12" fill="#8b95a7" text-anchor="end">${baseFret}</text>`;
+  }
+  // フレット線
+  for (let i = 0; i <= span; i++) {
+    const y = top + i * fretH;
+    s += `<line x1="${left}" y1="${y}" x2="${right}" y2="${y}" stroke="#4a5568" stroke-width="1"/>`;
+  }
+  // 弦
+  for (let i = 0; i < numStrings; i++) {
+    const x = left + i * stringGap;
+    s += `<line x1="${x}" y1="${top}" x2="${x}" y2="${top + span * fretH}" stroke="#8b95a7" stroke-width="${1 + (numStrings - 1 - i) * 0.25}"/>`;
+  }
+  // セーハ（バレー）の検出と描画
+  if (pressed.length >= 2) {
+    const bf = minF;
+    const idxs = frets.map((v, i) => ({ v, i })).filter(o => o.v === bf).map(o => o.i);
+    if (idxs.length >= 3 || (idxs.length === 2 && idxs.includes(5) && idxs[1] - idxs[0] >= 4)) {
+      const first = Math.min(...idxs), last = Math.max(...idxs);
+      let ok = true;
+      for (let i = first; i <= last; i++) if (frets[i] >= 0 && frets[i] < bf) ok = false;
+      if (ok && last - first >= 2) {
+        const y = top + (bf - baseFret + 0.5) * fretH;
+        s += `<rect x="${left + first * stringGap - 6}" y="${y - 6}" width="${(last - first) * stringGap + 12}" height="12" rx="6" fill="#f5a623" opacity="0.55"/>`;
+      }
+    }
+  }
+  // マーカー（●, ○, ×）
+  for (let i = 0; i < numStrings; i++) {
+    const x = left + i * stringGap;
+    const v = frets[i];
+    if (v === -1) {
+      s += `<text x="${x}" y="${top - 10}" font-size="12" fill="#f06060" text-anchor="middle">✕</text>`;
+    } else if (v === 0) {
+      s += `<circle cx="${x}" cy="${top - 14}" r="4.5" fill="none" stroke="#e8ecf3" stroke-width="1.5"/>`;
+    } else {
+      const y = top + (v - baseFret + 0.5) * fretH;
+      s += `<circle cx="${x}" cy="${y}" r="7" fill="#f5a623"/>`;
+    }
+  }
+  s += "</svg>";
+  return s;
+}
+
+/* 押さえ方どおりの音でストローク再生 */
+function strum(frets) {
+  getAudioCtx();
+  let delay = 0;
+  frets.forEach((v, i) => {
+    if (v < 0) return;
+    const freq = midiToFreq(GUITAR_STRINGS[i].midi + v);
+    pluck(freq, delay, 2.4, 0.16);
+    delay += 0.055;
+  });
+}
+
+function renderChord() {
+  const q = QUALITIES[selQual];
+  const name = NOTE_NAMES[selRoot] + q.key;
+  document.getElementById("chordName").textContent = name || NOTE_NAMES[selRoot];
+  const tones = q.intervals.map(iv => NOTE_NAMES[(selRoot + iv) % 12]);
+  document.getElementById("chordNotes").textContent = "構成音: " + [...new Set(tones)].join("・");
+
+  const wrap = document.getElementById("voicings");
+  wrap.innerHTML = "";
+  const voicings = buildVoicings(selRoot, q);
+  if (!voicings.length) {
+    wrap.innerHTML = `<div class="empty-msg">このコードの押さえ方データがありません</div>`;
+    return;
+  }
+  voicings.forEach(v => {
+    const div = document.createElement("div");
+    div.className = "voicing";
+    div.innerHTML = `<div class="vlabel">${v.label}</div>${drawDiagram(v.frets)}`;
+    const btn = document.createElement("button");
+    btn.className = "play-btn";
+    btn.textContent = "♪ 鳴らす";
+    btn.onclick = () => strum(v.frets);
+    div.appendChild(btn);
+    wrap.appendChild(div);
+  });
+}
+
+renderPickers();
+renderChord();
+</script>
+</body>
+</html>
