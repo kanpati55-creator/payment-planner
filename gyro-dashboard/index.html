@@ -46,7 +46,7 @@
     flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto 1.1fr 1fr;
     gap: 10px;
     min-height: 0;
   }
@@ -73,7 +73,6 @@
   #speedPanel { grid-column: 1 / -1; }
   #speedVal { font-size: clamp(48px, 16vw, 84px); line-height: 1; }
 
-  #horizonPanel, #gPanel { aspect-ratio: auto; }
   canvas { width: 100%; height: 100%; display: block; }
   .canvasWrap { width: 100%; flex: 1; min-height: 0; position: relative; }
   .readout {
@@ -86,7 +85,6 @@
   }
   .readout b { color: var(--text); font-weight: 600; }
 
-  #headingPanel .value { font-size: clamp(26px, 8vw, 40px); }
   #altPanel .value { font-size: clamp(26px, 8vw, 40px); }
 
   /* start overlay */
@@ -125,6 +123,7 @@
     padding: 8px 20px;
     font-size: 13px;
     cursor: pointer;
+    margin-top: 6px;
   }
 </style>
 </head>
@@ -134,7 +133,7 @@
   <h2>🚗 Gyro Car Dashboard</h2>
   <p>
     iPhoneをクルマのダッシュボードに固定して使う計器アプリです。<br>
-    ジャイロで<b>ロール／ピッチ（傾斜計)</b>、加速度センサーで<b>Gメーター</b>、
+    ジャイロで<b>傾斜計（左右・前後）</b>、加速度センサーで<b>Gメーター</b>、
     GPSで<b>速度</b>と<b>方位</b>を表示します。<br><br>
     ⚠️ 運転中は画面を注視しないでください。設定・キャリブレーションは必ず停車中に行ってください。
   </p>
@@ -154,13 +153,9 @@
       <div class="value" id="speedVal">--<span class="unit">km/h</span></div>
     </div>
 
-    <div class="panel" id="horizonPanel">
-      <div class="label">ATTITUDE</div>
-      <div class="canvasWrap"><canvas id="horizon"></canvas></div>
-      <div class="readout">
-        <span>ROLL <b id="rollVal">0°</b></span>
-        <span>PITCH <b id="pitchVal">0°</b></span>
-      </div>
+    <div class="panel" id="tiltPanel">
+      <div class="label">傾斜計</div>
+      <div class="canvasWrap"><canvas id="tilt"></canvas></div>
     </div>
 
     <div class="panel" id="gPanel">
@@ -172,10 +167,9 @@
       </div>
     </div>
 
-    <div class="panel" id="headingPanel">
-      <div class="label">HEADING</div>
-      <div class="value" id="headingVal">--<span class="unit">°</span></div>
-      <div class="readout"><span id="headingDir">—</span></div>
+    <div class="panel" id="compassPanel">
+      <div class="label">コンパス</div>
+      <div class="canvasWrap"><canvas id="compass"></canvas></div>
     </div>
 
     <div class="panel" id="altPanel">
@@ -205,7 +199,8 @@
     alt: null,                  // meters
   };
 
-  const DIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  const DIRS = ["北","北北東","北東","東北東","東","東南東","南東","南南東",
+                "南","南南西","南西","西南西","西","西北西","北西","北北西"];
 
   // ---- sensors ----
   function onOrientation(e) {
@@ -264,7 +259,7 @@
     window.addEventListener("devicemotion", onMotion);
   }
 
-  // ---- canvases ----
+  // ---- canvas helpers ----
   function fitCanvas(canvas) {
     const dpr = window.devicePixelRatio || 1;
     const r = canvas.parentElement.getBoundingClientRect();
@@ -273,60 +268,122 @@
     return dpr;
   }
 
-  const horizonC = $("horizon"), gballC = $("gball");
-
-  function drawHorizon() {
-    const dpr = fitCanvas(horizonC);
-    const ctx = horizonC.getContext("2d");
-    const w = horizonC.width, h = horizonC.height;
-    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 4 * dpr;
-    const roll = state.roll * Math.PI / 180;
-    const pitchPx = Math.max(-R, Math.min(R, state.pitch / 45 * R));
-
-    ctx.clearRect(0, 0, w, h);
-    ctx.save();
+  function rr(ctx, x, y, w, h, r) {
     ctx.beginPath();
-    ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.clip();
-
-    ctx.translate(cx, cy);
-    ctx.rotate(-roll);
-    ctx.translate(0, pitchPx);
-    // sky / ground
-    ctx.fillStyle = "#1d4f8b";
-    ctx.fillRect(-R * 2, -R * 3, R * 4, R * 3);
-    ctx.fillStyle = "#5b4322";
-    ctx.fillRect(-R * 2, 0, R * 4, R * 3);
-    // horizon line
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2 * dpr;
-    ctx.beginPath(); ctx.moveTo(-R * 2, 0); ctx.lineTo(R * 2, 0); ctx.stroke();
-    // pitch ladder every 10°
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 1.5 * dpr;
-    for (let d = -30; d <= 30; d += 10) {
-      if (d === 0) continue;
-      const y = -d / 45 * R;
-      ctx.beginPath(); ctx.moveTo(-R * 0.25, y); ctx.lineTo(R * 0.25, y); ctx.stroke();
-    }
-    ctx.restore();
-
-    // fixed aircraft symbol
-    ctx.strokeStyle = "#f6c445";
-    ctx.lineWidth = 3 * dpr;
-    ctx.beginPath();
-    ctx.moveTo(cx - R * 0.4, cy); ctx.lineTo(cx - R * 0.12, cy);
-    ctx.moveTo(cx + R * 0.12, cy); ctx.lineTo(cx + R * 0.4, cy);
-    ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, 3 * dpr, 0, Math.PI * 2); ctx.stroke();
-
-    // bezel
-    ctx.strokeStyle = "#2a3247";
-    ctx.lineWidth = 2 * dpr;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
   }
 
+  function tiltColor(deg) {
+    const a = Math.abs(deg);
+    return a >= 20 ? "#f2545b" : a >= 10 ? "#f6c445" : "#33d17a";
+  }
+
+  const tiltC = $("tilt"), gballC = $("gball"), compassC = $("compass");
+
+  // ---- tilt gauge (car icons) ----
+  function carRear(ctx, u, color) {
+    // wheels
+    ctx.fillStyle = "#1c2130";
+    rr(ctx, -u * 0.44, u * 0.10, u * 0.18, u * 0.16, u * 0.05); ctx.fill();
+    rr(ctx,  u * 0.26, u * 0.10, u * 0.18, u * 0.16, u * 0.05); ctx.fill();
+    // body
+    ctx.fillStyle = color;
+    rr(ctx, -u * 0.5, -u * 0.10, u, u * 0.28, u * 0.07); ctx.fill();
+    // cabin
+    rr(ctx, -u * 0.32, -u * 0.34, u * 0.64, u * 0.28, u * 0.09); ctx.fill();
+    // rear window
+    ctx.fillStyle = "#0b0e14";
+    rr(ctx, -u * 0.25, -u * 0.29, u * 0.5, u * 0.16, u * 0.05); ctx.fill();
+  }
+
+  function carSide(ctx, u, color) {
+    // wheels
+    ctx.fillStyle = "#1c2130";
+    ctx.beginPath(); ctx.arc(-u * 0.28, u * 0.14, u * 0.11, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc( u * 0.30, u * 0.14, u * 0.11, 0, Math.PI * 2); ctx.fill();
+    // body (front = right)
+    ctx.fillStyle = color;
+    rr(ctx, -u * 0.5, -u * 0.08, u, u * 0.22, u * 0.07); ctx.fill();
+    // cabin
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.30, -u * 0.08);
+    ctx.lineTo(-u * 0.24, -u * 0.30);
+    ctx.lineTo( u * 0.14, -u * 0.30);
+    ctx.lineTo( u * 0.26, -u * 0.08);
+    ctx.closePath(); ctx.fill();
+    // window
+    ctx.fillStyle = "#0b0e14";
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.22, -u * 0.10);
+    ctx.lineTo(-u * 0.18, -u * 0.26);
+    ctx.lineTo( u * 0.10, -u * 0.26);
+    ctx.lineTo( u * 0.19, -u * 0.10);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawTiltHalf(ctx, dpr, x, y, w, h, deg, mode) {
+    const cx = x + w / 2, cy = y + h * 0.58;
+    const u = Math.min(w, h * 1.3) * 0.62;
+    const clamped = Math.max(-45, Math.min(45, deg));
+    // roll: right side down = clockwise. pitch: uphill = front (right) up = counterclockwise.
+    const shown = mode === "roll" ? clamped : -clamped;
+    const color = tiltColor(deg);
+
+    // dashed horizon reference line
+    ctx.strokeStyle = "#2a3247";
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.setLineDash([5 * dpr, 5 * dpr]);
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.06, cy + u * 0.26);
+    ctx.lineTo(x + w * 0.94, cy + u * 0.26);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // rotated car
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(shown * Math.PI / 180);
+    if (mode === "roll") carRear(ctx, u, color); else carSide(ctx, u, color);
+    ctx.restore();
+
+    // panel title (top-left) and degree readout (top-right)
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#8b94a8";
+    ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
+    ctx.fillText(mode === "roll" ? "左右の傾き" : "前後の坂", x + 8 * dpr, y + 6 * dpr);
+
+    let dirTxt;
+    const a = Math.abs(deg);
+    if (a < 0.5) dirTxt = "水平";
+    else if (mode === "roll") dirTxt = (deg > 0 ? "右 " : "左 ") + a.toFixed(0) + "°";
+    else dirTxt = (deg > 0 ? "上り " : "下り ") + a.toFixed(0) + "°";
+    ctx.textAlign = "right";
+    ctx.fillStyle = color;
+    ctx.font = `bold ${17 * dpr}px -apple-system, sans-serif`;
+    ctx.fillText(dirTxt, x + w - 8 * dpr, y + 4 * dpr);
+  }
+
+  function drawTilt() {
+    const dpr = fitCanvas(tiltC);
+    const ctx = tiltC.getContext("2d");
+    const w = tiltC.width, h = tiltC.height;
+    ctx.clearRect(0, 0, w, h);
+
+    drawTiltHalf(ctx, dpr, 0, 0, w, h / 2, state.roll, "roll");
+    // separator
+    ctx.strokeStyle = "#2a3247";
+    ctx.lineWidth = 1 * dpr;
+    ctx.beginPath(); ctx.moveTo(w * 0.06, h / 2); ctx.lineTo(w * 0.94, h / 2); ctx.stroke();
+    drawTiltHalf(ctx, dpr, 0, h / 2, w, h / 2, state.pitch, "pitch");
+  }
+
+  // ---- G ball ----
   function drawGBall() {
     const dpr = fitCanvas(gballC);
     const ctx = gballC.getContext("2d");
@@ -335,19 +392,16 @@
     const scale = 1.0; // outer ring = 1.0 G
 
     ctx.clearRect(0, 0, w, h);
-    // rings 0.5G / 1.0G
     ctx.strokeStyle = "#2a3247";
     ctx.lineWidth = 1.5 * dpr;
     for (const g of [0.5, 1.0]) {
       ctx.beginPath(); ctx.arc(cx, cy, R * g / scale, 0, Math.PI * 2); ctx.stroke();
     }
-    // crosshair
     ctx.beginPath();
     ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
     ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
     ctx.stroke();
 
-    // G dot (clamped to ring)
     let gx = state.gx / scale, gy = state.gy / scale;
     const m = Math.hypot(gx, gy);
     if (m > 1) { gx /= m; gy /= m; }
@@ -358,22 +412,92 @@
     ctx.fill();
   }
 
+  // ---- compass ----
+  function drawCompass() {
+    const dpr = fitCanvas(compassC);
+    const ctx = compassC.getContext("2d");
+    const w = compassC.width, h = compassC.height;
+    const cx = w / 2, cy = h / 2 + 4 * dpr;
+    const R = Math.min(w, h) / 2 - 8 * dpr;
+    const hasHdg = state.heading !== null;
+    const hdg = hasHdg ? state.heading : 0;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // outer ring
+    ctx.strokeStyle = "#2a3247";
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+
+    // rotating rose: ticks + cardinal letters (upright text)
+    const CARD = [
+      { d: 0,   t: "北", major: true },
+      { d: 45,  t: "北東" },
+      { d: 90,  t: "東", major: true },
+      { d: 135, t: "南東" },
+      { d: 180, t: "南", major: true },
+      { d: 225, t: "南西" },
+      { d: 270, t: "西", major: true },
+      { d: 315, t: "北西" },
+    ];
+    // minor ticks every 15°
+    for (let d = 0; d < 360; d += 15) {
+      const a = (d - hdg) * Math.PI / 180;
+      const s = Math.sin(a), c = -Math.cos(a);
+      const r1 = R * (d % 45 === 0 ? 0.86 : 0.92);
+      ctx.strokeStyle = d % 45 === 0 ? "#8b94a8" : "#2a3247";
+      ctx.lineWidth = (d % 45 === 0 ? 2 : 1.5) * dpr;
+      ctx.beginPath();
+      ctx.moveTo(cx + s * r1, cy + c * r1);
+      ctx.lineTo(cx + s * R * 0.97, cy + c * R * 0.97);
+      ctx.stroke();
+    }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const k of CARD) {
+      const a = (k.d - hdg) * Math.PI / 180;
+      const s = Math.sin(a), c = -Math.cos(a);
+      const r = R * (k.major ? 0.68 : 0.70);
+      if (k.major) {
+        ctx.font = `bold ${Math.round(R * 0.24)}px -apple-system, sans-serif`;
+        ctx.fillStyle = k.d === 0 ? "#f2545b" : "#e8ecf5";
+      } else {
+        ctx.font = `${Math.round(R * 0.13)}px -apple-system, sans-serif`;
+        ctx.fillStyle = "#8b94a8";
+      }
+      ctx.fillText(k.t, cx + s * r, cy + c * r);
+    }
+
+    // fixed pointer at top = direction of travel
+    ctx.fillStyle = "#f6c445";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - R + 4 * dpr);
+    ctx.lineTo(cx - 7 * dpr, cy - R - 8 * dpr);
+    ctx.lineTo(cx + 7 * dpr, cy - R - 8 * dpr);
+    ctx.closePath();
+    ctx.fill();
+
+    // center readout
+    ctx.fillStyle = hasHdg ? "#e8ecf5" : "#8b94a8";
+    ctx.font = `bold ${Math.round(R * 0.30)}px -apple-system, sans-serif`;
+    ctx.fillText(hasHdg ? Math.round(hdg) + "°" : "--", cx, cy - R * 0.10);
+    ctx.font = `bold ${Math.round(R * 0.19)}px -apple-system, sans-serif`;
+    ctx.fillStyle = hasHdg ? "#33d17a" : "#8b94a8";
+    ctx.fillText(hasHdg ? DIRS[Math.round(hdg / 22.5) % 16] : "—", cx, cy + R * 0.16);
+  }
+
   // ---- render loop ----
   function fmt(n, digits = 0) {
     return n === null || Number.isNaN(n) ? "--" : n.toFixed(digits);
   }
 
   function render() {
-    drawHorizon();
+    drawTilt();
     drawGBall();
-    $("rollVal").textContent = fmt(state.roll, 1) + "°";
-    $("pitchVal").textContent = fmt(state.pitch, 1) + "°";
+    drawCompass();
     $("gVal").textContent = Math.hypot(state.gx, state.gy).toFixed(2) + "G";
     $("gMax").textContent = state.gMax.toFixed(2) + "G";
     $("speedVal").innerHTML = fmt(state.speed) + '<span class="unit">km/h</span>';
-    $("headingVal").innerHTML = fmt(state.heading) + '<span class="unit">°</span>';
-    $("headingDir").textContent = state.heading === null
-      ? "—" : DIRS[Math.round(state.heading / 22.5) % 16];
     $("altVal").innerHTML = fmt(state.alt) + '<span class="unit">m</span>';
     requestAnimationFrame(render);
   }
