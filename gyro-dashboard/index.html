@@ -152,7 +152,7 @@
 
   <div class="grid">
     <div class="panel" id="speedPanel">
-      <div class="label">SPEED</div>
+      <div class="label">速度</div>
       <div class="value" id="speedVal">--<span class="unit">km/h</span></div>
     </div>
 
@@ -175,7 +175,7 @@
     </div>
 
     <div class="panel" id="altPanel">
-      <div class="label">ALTITUDE</div>
+      <div class="label">標高</div>
       <div class="value" id="altVal">--<span class="unit">m</span></div>
       <button id="calBtn">水平キャリブレーション</button>
     </div>
@@ -538,13 +538,26 @@
     return n === null || Number.isNaN(n) ? "--" : n.toFixed(digits);
   }
 
+  function speedColor(v) {
+    if (v === null || Number.isNaN(v)) return "#e8ecf5";
+    return v >= 120 ? "#f2545b" : v >= 90 ? "#ff9838" : v >= 60 ? "#f6c445" : "#33d17a";
+  }
+
+  function altColor(a) {
+    if (a === null || Number.isNaN(a)) return "#e8ecf5";
+    if (a < 0) return "#4da3ff";
+    return a >= 2000 ? "#f2545b" : a >= 1000 ? "#ff9838" : a >= 500 ? "#f6c445" : "#33d17a";
+  }
+
   function render() {
     drawTilt();
     drawGBall();
     drawCompass();
     $("gMax").textContent = state.gMax.toFixed(2) + "G";
     $("speedVal").innerHTML = fmt(state.speed) + '<span class="unit">km/h</span>';
+    $("speedVal").style.color = speedColor(state.speed);
     $("altVal").innerHTML = fmt(state.alt) + '<span class="unit">m</span>';
+    $("altVal").style.color = altColor(state.alt);
     requestAnimationFrame(render);
   }
 
