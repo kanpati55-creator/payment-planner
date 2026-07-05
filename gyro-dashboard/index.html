@@ -165,7 +165,6 @@
       <div class="label">G-FORCE</div>
       <div class="canvasWrap"><canvas id="gball"></canvas></div>
       <div class="readout">
-        <span>NOW <b id="gVal">0.00G</b></span>
         <span>MAX <b id="gMax">0.00G</b></span>
       </div>
     </div>
@@ -387,32 +386,77 @@
   }
 
   // ---- G ball ----
+  const gTrail = [];
   function drawGBall() {
     const dpr = fitCanvas(gballC);
     const ctx = gballC.getContext("2d");
     const w = gballC.width, h = gballC.height;
-    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 4 * dpr;
     const scale = 1.0; // outer ring = 1.0 G
 
     ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = "#2a3247";
+
+    const mag = Math.hypot(state.gx, state.gy);
+    const color = mag > 0.8 ? "#f2545b" : mag > 0.4 ? "#f6c445" : "#33d17a";
+
+    // big current-G number at top
+    const numH = h * 0.22;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = color;
+    ctx.font = `bold ${Math.round(numH * 0.72)}px -apple-system, sans-serif`;
+    ctx.fillText(mag.toFixed(2) + " G", w / 2, numH / 2 + 4 * dpr);
+
+    // friction circle below the number
+    const cx = w / 2;
+    const cy = numH + (h - numH) / 2;
+    const R = Math.min(w / 2, (h - numH) / 2) - 12 * dpr;
+
+    // crosshair
+    ctx.strokeStyle = "#232b3e";
     ctx.lineWidth = 1.5 * dpr;
-    for (const g of [0.5, 1.0]) {
-      ctx.beginPath(); ctx.arc(cx, cy, R * g / scale, 0, Math.PI * 2); ctx.stroke();
-    }
     ctx.beginPath();
     ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
     ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
     ctx.stroke();
 
+    // rings 0.5G / 1.0G with labels on the 45° diagonal
+    ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
+    for (const g of [0.5, 1.0]) {
+      const r = R * g / scale;
+      ctx.strokeStyle = g === 1.0 ? "#3a4763" : "#2a3247";
+      ctx.lineWidth = (g === 1.0 ? 2 : 1.5) * dpr;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#8b94a8";
+      ctx.fillText(g.toFixed(1) + "G", cx + r * 0.707, cy - r * 0.707 - 8 * dpr);
+    }
+
+    // trail (last ~0.7s of movement, fading out)
+    gTrail.push({ x: state.gx, y: state.gy });
+    if (gTrail.length > 40) gTrail.shift();
+    for (let i = 0; i < gTrail.length; i++) {
+      let tx = gTrail[i].x / scale, ty = gTrail[i].y / scale;
+      const tm = Math.hypot(tx, ty);
+      if (tm > 1) { tx /= tm; ty /= tm; }
+      ctx.fillStyle = `rgba(139,148,168,${((i + 1) / gTrail.length * 0.30).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(cx + tx * R, cy + ty * R, 3.5 * dpr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // dot (clamped to outer ring) with glow and white border
     let gx = state.gx / scale, gy = state.gy / scale;
     const m = Math.hypot(gx, gy);
     if (m > 1) { gx /= m; gy /= m; }
-    const mag = Math.hypot(state.gx, state.gy);
-    ctx.fillStyle = mag > 0.8 ? "#f2545b" : mag > 0.4 ? "#f6c445" : "#33d17a";
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 14 * dpr;
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(cx + gx * R, cy + gy * R, 7 * dpr, 0, Math.PI * 2);
+    ctx.arc(cx + gx * R, cy + gy * R, 10 * dpr, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.stroke();
   }
 
   // ---- compass ----
@@ -498,7 +542,6 @@
     drawTilt();
     drawGBall();
     drawCompass();
-    $("gVal").textContent = Math.hypot(state.gx, state.gy).toFixed(2) + "G";
     $("gMax").textContent = state.gMax.toFixed(2) + "G";
     $("speedVal").innerHTML = fmt(state.speed) + '<span class="unit">km/h</span>';
     $("altVal").innerHTML = fmt(state.alt) + '<span class="unit">m</span>';
