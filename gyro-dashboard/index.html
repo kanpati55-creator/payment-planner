@@ -65,7 +65,8 @@
     min-height: 0;
   }
   .panel .label {
-    font-size: 11px;
+    font-size: 14px;
+    font-weight: 600;
     letter-spacing: 0.12em;
     color: var(--dim);
     margin-bottom: 4px;
@@ -119,15 +120,17 @@
   #startBtn:active { transform: scale(0.97); }
   #err { color: var(--danger); font-size: 13px; min-height: 1.2em; }
   #calBtn {
-    background: none;
-    border: 1px solid var(--line);
-    color: var(--dim);
+    background: var(--accent);
+    border: none;
+    color: #06210f;
+    font-weight: 700;
     border-radius: 999px;
-    padding: 8px 20px;
-    font-size: 13px;
+    padding: 12px 28px;
+    font-size: 15px;
     cursor: pointer;
-    margin-top: 6px;
+    margin-top: 10px;
   }
+  #calBtn:active { transform: scale(0.96); }
 </style>
 </head>
 <body>
@@ -177,7 +180,7 @@
     <div class="panel" id="altPanel">
       <div class="label">標高</div>
       <div class="value" id="altVal">--<span class="unit">m</span></div>
-      <button id="calBtn">水平キャリブレーション</button>
+      <button id="calBtn">水平リセット</button>
     </div>
   </div>
 </div>
@@ -223,9 +226,10 @@
     const a = e.acceleration;
     if (!a || a.x === null) return;
     const G = 9.80665, k = 0.15; // low-pass filter
-    // Portrait mount: x = lateral, z(toward driver) = longitudinal
+    // Portrait mount: x = lateral, z(toward driver) = longitudinal.
+    // Screen-up on the G ball = direction of travel (accel up, braking down).
     state.gx = state.gx + k * ((a.x / G) - state.gx);
-    state.gy = state.gy + k * ((-a.z / G) - state.gy);
+    state.gy = state.gy + k * ((a.z / G) - state.gy);
     const mag = Math.hypot(state.gx, state.gy);
     if (mag > state.gMax) state.gMax = mag;
   }
@@ -357,7 +361,7 @@
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
     ctx.fillStyle = "#8b94a8";
-    ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
+    ctx.font = `600 ${13 * dpr}px -apple-system, sans-serif`;
     ctx.fillText(mode === "roll" ? "左右の傾き" : "前後の坂", x + 8 * dpr, y + 6 * dpr);
 
     let dirTxt;
@@ -429,6 +433,12 @@
       ctx.fillStyle = "#8b94a8";
       ctx.fillText(g.toFixed(1) + "G", cx + r * 0.707, cy - r * 0.707 - 8 * dpr);
     }
+
+    // direction labels: top = direction of travel
+    ctx.font = `bold ${13 * dpr}px -apple-system, sans-serif`;
+    ctx.fillStyle = "#8b94a8";
+    ctx.fillText("前", cx, cy - R + 13 * dpr);
+    ctx.fillText("後", cx, cy + R - 13 * dpr);
 
     // trail (last ~0.7s of movement, fading out)
     gTrail.push({ x: state.gx, y: state.gy });
