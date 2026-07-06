@@ -199,6 +199,7 @@
     rollZero: 0, pitchZero: 0,  // calibration offsets
     gx: 0, gy: 0,               // lateral / longitudinal G (smoothed)
     gMax: 0,
+    grav: { x: 0, y: -9.8, z: 0 }, // low-passed gravity vector (upright default)
     speed: null,                // km/h
     heading: null,              // degrees
     alt: null,                  // meters
@@ -209,12 +210,8 @@
 
   // ---- sensors ----
   function onOrientation(e) {
-    if (e.beta === null || e.gamma === null) return;
-    // Portrait mount assumed: beta = pitch, gamma = roll.
-    state.pitchRaw = e.beta - 90; // 90° = phone standing upright on dash
-    state.rollRaw = e.gamma;
-    state.pitch = state.pitchRaw - state.pitchZero;
-    state.roll = state.rollRaw - state.rollZero;
+    // Tilt comes from the gravity vector in onMotion — Euler angles (beta/gamma)
+    // blow up near the upright-portrait pose this app is mounted in.
     if (e.webkitCompassHeading !== undefined && !Number.isNaN(e.webkitCompassHeading)) {
       state.heading = e.webkitCompassHeading;
     } else if (e.absolute && e.alpha !== null) {
@@ -223,15 +220,36 @@
   }
 
   function onMotion(e) {
-    const a = e.acceleration;
-    if (!a || a.x === null) return;
     const G = 9.80665, k = 0.15; // low-pass filter
-    // Portrait mount: x = lateral, z(toward driver) = longitudinal.
-    // Screen-up on the G ball = direction of travel (accel up, braking down).
-    state.gx = state.gx + k * ((a.x / G) - state.gx);
-    state.gy = state.gy + k * ((a.z / G) - state.gy);
-    const mag = Math.hypot(state.gx, state.gy);
-    if (mag > state.gMax) state.gMax = mag;
+    const a = e.acceleration;
+    if (a && a.x !== null) {
+      // Portrait mount: x = lateral, z(toward driver) = longitudinal.
+      // Screen-up on the G ball = direction of travel (accel up, braking down).
+      state.gx = state.gx + k * ((a.x / G) - state.gx);
+      state.gy = state.gy + k * ((a.z / G) - state.gy);
+      const mag = Math.hypot(state.gx, state.gy);
+      if (mag > state.gMax) state.gMax = mag;
+    }
+
+    // Tilt from the gravity vector — stable at any mounting angle, unlike
+    // beta/gamma which have a singularity when the phone stands upright.
+    const gi = e.accelerationIncludingGravity;
+    if (gi && gi.x !== null) {
+      const kg = 0.08, gr = state.grav;
+      gr.x += kg * (gi.x - gr.x);
+      gr.y += kg * (gi.y - gr.y);
+      gr.z += kg * (gi.z - gr.z);
+      const m = Math.hypot(gr.x, gr.y, gr.z) || 1;
+      // iOS reports the gravity direction, the W3C spec its reaction — the
+      // sign of y (down the standing phone) tells which convention is live.
+      const f = gr.y < 0 ? 1 : -1;
+      const R2D = 180 / Math.PI;
+      const clamp1 = (v) => Math.max(-1, Math.min(1, v));
+      state.rollRaw = f * Math.asin(clamp1(gr.x / m)) * R2D;
+      state.pitchRaw = -f * Math.asin(clamp1(gr.z / m)) * R2D;
+      state.roll = state.rollRaw - state.rollZero;
+      state.pitch = state.pitchRaw - state.pitchZero;
+    }
   }
 
   function startGeolocation() {
