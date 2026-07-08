@@ -2,8 +2,9 @@ import flet as ft
 import requests
 import os
 
-# Renderの環境変数からGASのURLを読み込む
-GAS_URL = os.getenv("GAS_URL", "YOUR_GAS_WEBAPP_URL_HERE")
+# GASのWebアプリURLは必ず環境変数から読み込む。
+# コードに直接書くと、公開リポジトリから誰でも支払いデータにアクセスできてしまう。
+GAS_URL = os.getenv("GAS_URL")
 
 def main(page: ft.Page):
     page.title = "翌月資金移動プランナー"
@@ -17,8 +18,20 @@ def main(page: ft.Page):
         list_view.controls.clear()
         page.update()
         
+        if not GAS_URL:
+            list_view.controls.append(
+                ft.Text(
+                    "環境変数 GAS_URL が設定されていません。"
+                    "RenderのEnvironmentタブ（ローカルなら実行前のexport）でGASのWebアプリURLを設定してください。",
+                    color=ft.Colors.RED,
+                )
+            )
+            page.update()
+            return
+
         try:
-            response = requests.get(GAS_URL)
+            response = requests.get(GAS_URL, timeout=15)
+            response.raise_for_status()
             data = response.json()
             
             grand_total = 0

@@ -37,6 +37,26 @@ python3 -m http.server 8000
 
 コード検索だけなら `index.html` をダブルクリックで開くだけでも動きます。
 
+## 💰 翌月資金移動プランナー（payment_planner.py）
+
+Google Apps Script (GAS) のWebアプリから支払い予定を取得して表示するFletアプリです。
+
+### セットアップ
+GASのWebアプリURLは**環境変数 `GAS_URL`** で渡します。コードには書きません。
+
+```bash
+# ローカルで実行する場合
+export GAS_URL="https://script.google.com/macros/s/（自分のデプロイID）/exec"
+python3 payment_planner.py
+```
+
+Renderにデプロイする場合は、ダッシュボードの **Environment → Environment Variables** に `GAS_URL` を追加してください。
+
+### ⚠️ セキュリティ上の注意
+- GASのWebアプリURLは**秘密情報として扱う**こと。URLを知っている人は誰でも支払いデータ（口座名・支払先・金額）を取得できます。
+- URL・APIキー・トークンの類いは絶対にコードやREADMEに直接書かず、環境変数や `.env`（gitignore済み）を使うこと。
+- もし誤ってコミット・pushしてしまった場合は、履歴から消すだけでは不十分です。**GAS側で該当デプロイをアーカイブして新しいURLで再デプロイ**（＝漏れたURLの無効化）を必ず行うこと。
+
 ## 技術メモ
 - 依存ライブラリなしの単一 HTML ファイル（HTML + CSS + JavaScript）
 - チューナー：Web Audio API + 自己相関（ACF2+）によるピッチ検出、放物線補間つき
