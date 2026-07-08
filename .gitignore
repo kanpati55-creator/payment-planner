@@ -1,0 +1,11 @@
+# 秘密情報はコミットしない
+.env
+.env.*
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
