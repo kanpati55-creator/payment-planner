@@ -249,7 +249,7 @@
       const R2D = 180 / Math.PI;
       const clamp1 = (v) => Math.max(-1, Math.min(1, v));
       state.rollRaw = f * Math.asin(clamp1(gr.x / m)) * R2D;
-      state.pitchRaw = -f * Math.asin(clamp1(gr.z / m)) * R2D;
+      state.pitchRaw = f * Math.asin(clamp1(gr.z / m)) * R2D;
       state.roll = state.rollRaw - state.rollZero;
       state.pitch = state.pitchRaw - state.pitchZero;
     }
