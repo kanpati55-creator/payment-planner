@@ -181,18 +181,22 @@
   details.editor summary {
     cursor: pointer; user-select: none;
     list-style: none;
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 12px; padding: 13px 16px;
-    font-size: .95rem; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; flex-wrap: wrap;
+    background: var(--accent); border: 1px solid transparent;
+    border-radius: 12px; padding: 15px 18px;
+    font-size: 1.05rem; font-weight: 700; color: var(--accent-text);
+    text-align: center;
   }
   details.editor summary::-webkit-details-marker { display: none; }
-  details.editor summary::before {
-    content: "▸"; color: var(--note); font-size: 1.05em;
+  details.editor summary::before { content: "✎"; font-size: 1.1em; }
+  details.editor summary:active { transform: translateY(1px); }
+  details.editor[open] summary {
+    background: var(--panel); color: var(--text);
+    border-color: var(--border);
   }
-  details.editor[open] summary::before { content: "▾"; }
-  details.editor summary:hover { border-color: var(--note); }
-  .summary-hint { font-size: .76rem; font-weight: 400; color: var(--sub); }
+  details.editor[open] summary::before { content: "▾"; color: var(--note); }
+  .summary-hint { font-size: .78rem; font-weight: 400; opacity: .8; }
   .editor-body {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 12px; padding: 12px; margin-top: 6px;
@@ -265,7 +269,7 @@
   </div>
 
   <details class="editor" id="editor">
-    <summary>タブ譜を編集・貼り付け・保存<span class="summary-hint">曲の追加やタブ譜の入力はここを開く</span></summary>
+    <summary>曲を追加・タブ譜を入力する<span class="summary-hint">(貼り付け・保存・ファイル読み込みもここ)</span></summary>
     <div class="editor-body">
       <div class="editor-actions" style="margin-top:0;margin-bottom:8px;">
         <label class="ctl">タイトル <input type="text" id="songTitle" placeholder="曲名を入力"></label>
