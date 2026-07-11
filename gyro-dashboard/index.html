@@ -233,12 +233,15 @@
 
     // Tilt from the gravity vector — stable at any mounting angle, unlike
     // beta/gamma which have a singularity when the phone stands upright.
+    // Subtracting the fused user-acceleration keeps braking/accelerating on a
+    // flat road from reading as a slope.
     const gi = e.accelerationIncludingGravity;
     if (gi && gi.x !== null) {
+      const hasA = a && a.x !== null;
       const kg = 0.08, gr = state.grav;
-      gr.x += kg * (gi.x - gr.x);
-      gr.y += kg * (gi.y - gr.y);
-      gr.z += kg * (gi.z - gr.z);
+      gr.x += kg * ((gi.x - (hasA ? a.x : 0)) - gr.x);
+      gr.y += kg * ((gi.y - (hasA ? a.y : 0)) - gr.y);
+      gr.z += kg * ((gi.z - (hasA ? a.z : 0)) - gr.z);
       const m = Math.hypot(gr.x, gr.y, gr.z) || 1;
       // iOS reports the gravity direction, the W3C spec its reaction — the
       // sign of y (down the standing phone) tells which convention is live.
