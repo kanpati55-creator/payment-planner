@@ -215,10 +215,80 @@ function kaizenMap() {
   };
 }
 
+
+// ---------- 4. 専門家プロフィール（経歴書・A4） ----------
+function profile() {
+  const W = 9740;
+  const career = [
+    ["1982〜1993", "ポンプ関係の会社", "セールスエンジニアとして営業・技術職に従事。1991年より営業所長"],
+    ["1994〜2003", "建設会社（土木）", "現場監督を経て営業所長。官公庁への営業、建設コンサルタントへの提案営業、土木設計業務"],
+    ["2003〜2007", "同社系列会社", "海運会社・民間企業向けコンテナのリース・販売。中国メーカーとの契約・発注業務"],
+    ["2007〜2018", "独立（自営）", "土木設計、損害保険会社の補償工事の仲介"],
+    ["2019〜2021", "児童福祉施設・個人病院", "開設に事務長として従事（許認可・体制整備・運営基盤づくり）"],
+    ["2022〜2023", "公益社団法人（経営企画課）", "児童発達支援事業所の発足に従事"],
+    ["2024〜2025", "建設会社", "施工と設計の一体化を図る部署の責任者。現場改革と社内業務のDX化を推進"],
+    ["2026〜現在", "独立（自営）", "中小企業向け業務改善の受託。診断から自動化ツールの実装まで一気通貫で支援"],
+  ];
+  const careerTable = new Table({
+    columnWidths: [1700, 2800, 5240],
+    rows: [
+      new TableRow({ children: [
+        cell("期間", 1700, { fill: LIGHT, bold: true }),
+        cell("所属", 2800, { fill: LIGHT, bold: true }),
+        cell("主な業務", 5240, { fill: LIGHT, bold: true }),
+      ]}),
+      ...career.map(([y, org, desc]) => new TableRow({ children: [
+        cell(y, 1700), cell(org, 2800), cell(desc, 5240),
+      ]})),
+    ],
+  });
+  return {
+    properties: { page: { margin: { top: 560, bottom: 560, left: 850, right: 850 } } },
+    children: [
+      p([run("専門家プロフィール", { size: 34, bold: true })], { align: AlignmentType.CENTER, after: 40 }),
+      p([run("建設・土木の業務改善コンサルタント（現場帳票のデジタル化・自動化ツール実装）", { size: 22, bold: true, color: ACCENT })], { align: AlignmentType.CENTER, after: 120 }),
+
+      new Table({
+        columnWidths: [2200, 7540],
+        rows: [
+          new TableRow({ height: { value: 420, rule: HeightRule.ATLEAST }, children: [cell("氏名", 2200, { fill: GREY, bold: true }), cell("【氏名を記入】", 7540)] }),
+          new TableRow({ height: { value: 420, rule: HeightRule.ATLEAST }, children: [cell("屋号", 2200, { fill: GREY, bold: true }), cell("【屋号を記入】", 7540)] }),
+          new TableRow({ height: { value: 420, rule: HeightRule.ATLEAST }, children: [cell("連絡先", 2200, { fill: GREY, bold: true }), cell("【電話】000-0000-0000　【メール】example@example.com", 7540)] }),
+          new TableRow({ height: { value: 420, rule: HeightRule.ATLEAST }, children: [cell("保有資格", 2200, { fill: GREY, bold: true }), cell("【保有資格を記入（例：土木施工管理技士 等）】", 7540)] }),
+        ],
+      }),
+
+      heading("プロフィール要約", { before: 120 }),
+      p("建設・土木業界に44年携わり、現場監督・土木設計・官公庁営業・営業所長・DX推進部署の責任者を歴任。発注者（官公庁）側の事情と下請の現場感覚の両方を理解した業務改善を持ち味とする。福祉施設・病院・事業所の開設（事務長・経営企画）など、異業種での事業立ち上げ経験も持つ。2026年に独立し、中小建設業を中心に、業務の棚卸し診断からExcel・AI等を使った自動化ツールの実装までを一気通貫で支援している。", { size: 20, after: 80 }),
+
+      heading("専門分野", { before: 120 }),
+      p("建設・土木業の業務改善（日報・工程・安全書類・請求まわりの事務負担軽減）", { bullet: true }),
+      p("紙・Excel業務の自動化ツール開発（Excel VBA／Python／生成AI活用）", { bullet: true }),
+      p("元請指定様式との二重入力解消、施工管理アプリの導入・定着支援", { bullet: true }),
+      p("福祉・医療施設の開設支援（許認可・体制整備）", { bullet: true }),
+      p("デジタル化・AI導入補助金など、IT関連補助金の活用相談", { bullet: true }),
+
+      heading("支援メニュー", { before: 120 }),
+      p([run("現場業務の棚卸し診断　", { size: 20, bold: true }), run("90分の訪問ヒアリングで業務を棚卸しし、改善マップと自動化の概算見積りを納品", { size: 20 })], { step: true }),
+      p([run("自動化ツールの実装　", { size: 20, bold: true }), run("Excel転記の自動化・日報のスマホ化・書類の自動作成などを個別開発", { size: 20 })], { step: true }),
+      p([run("導入・定着の伴走支援　", { size: 20, bold: true }), run("ツール選定から「現場が使い続ける」仕組みづくりまで", { size: 20 })], { step: true }),
+
+      heading("職務経歴", { before: 120 }),
+      careerTable,
+
+      heading("強み", { before: 120 }),
+      p("現場・設計・営業・経営のすべての視点を持ち、経営者とも職人とも同じ言葉で話せる", { bullet: true }),
+      p("事業立ち上げ4件（福祉施設・病院・支援事業所・社内新部署）を実務で完遂", { bullet: true }),
+      p("VBA・Pythonによる事務処理自動化ツールの開発実績。生成AIを日常業務で活用", { bullet: true }),
+    ],
+  };
+}
+
 const docs = [
   ["shindan-annai.docx", flyer()],
   ["hearing-sheet.docx", hearingSheet()],
   ["kaizen-map.docx", kaizenMap()],
+  ["senmonka-profile.docx", profile()],
 ];
 
 (async () => {
