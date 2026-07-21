@@ -81,6 +81,37 @@ Renderにデプロイする場合は起動コマンドを `python investment_tra
 - 株価や基準価額を外部から自動取得する機能はありません（手入力の評価額を管理する用途）。
 - データは端末ローカル保存のため、別の端末やブラウザには引き継がれません。
 
+## 📱 投資一覧のiPhoneアプリ版（PWA / investments.html）
+
+`investment_tracker.py` と同じ機能を、**サーバー不要の単一HTML（PWA）**で再現したものです。
+iPhoneのホーム画面に追加すると、独自アイコンで全画面起動し、ネイティブアプリのように使えます。
+オフラインでも起動でき、データはブラウザ内（localStorage）に保存されます。
+
+関連ファイル：`investments.html` / `manifest.webmanifest` / `sw.js` / `icons/`
+
+### iPhoneのホーム画面に追加する手順
+1. まずHTTPSで公開する（下の「公開方法」参照）。※PWA機能はhttpsまたは`localhost`でのみ動作します。
+2. iPhoneの **Safari** で公開URLの `.../investments.html` を開く
+3. 下部の **共有ボタン（□に↑）** → **「ホーム画面に追加」** をタップ
+4. ホーム画面に「投資一覧」アイコンが追加され、タップすると全画面のアプリとして起動
+
+### 公開方法（GitHub Pages・無料・HTTPS）
+1. GitHubリポジトリの **Settings → Pages** を開く
+2. 「Source」で **Deploy from a branch** を選び、このブランチと `/ (root)` を指定して Save
+3. 発行されたURLの末尾に `/investments.html` を付けてSafariで開く
+
+### ローカルで試す場合
+```bash
+python3 -m http.server 8000
+# 同じ端末なら http://localhost:8000/investments.html
+# （Service Workerはlocalhostでも動作します）
+```
+
+### メモ
+- Flet版（`investment_tracker.py`）とデータは共有されません（保存先が別）。
+- アプリを更新したときは `sw.js` の `CACHE` 名（`invest-tracker-v1` の数字）を上げると、古いキャッシュが確実に更新されます。
+- Safariのプライベートモードやデータ消去を行うと保存データは消えます。
+
 ## 技術メモ
 - 依存ライブラリなしの単一 HTML ファイル（HTML + CSS + JavaScript）
 - チューナー：Web Audio API + 自己相関（ACF2+）によるピッチ検出、放物線補間つき

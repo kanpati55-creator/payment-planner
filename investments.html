@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>投資ポートフォリオ一覧</title>
+
+<!-- PWA / iOSホーム画面アプリ設定 -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="投資一覧">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+
+<style>
+  :root{
+    --indigo:#4f46e5; --indigo-dark:#3730a3; --indigo-50:#eef2ff; --indigo-200:#c7d2fe;
+    --bank:#2563eb; --bank-bg:#eff6ff;
+    --sec:#15803d; --sec-bg:#f0fdf4;
+    --line:#e5e7eb; --grey:#6b7280; --bg:#f6f7fb; --card:#ffffff; --text:#1f2937;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --indigo-50:#20213a; --indigo-200:#3b3f7a;
+      --bank-bg:#16233d; --sec-bg:#14281c;
+      --line:#333744; --grey:#9aa1ad; --bg:#0f1115; --card:#181b22; --text:#e6e8ec;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    background:var(--bg); color:var(--text);
+    -webkit-text-size-adjust:100%;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:16px 16px 48px;}
+  h1{font-size:22px; margin:8px 0 4px;}
+  .sub{color:var(--grey); font-size:13px; margin:0 0 16px; line-height:1.5;}
+
+  .summary{background:var(--indigo-50); border:2px solid var(--indigo-200); border-radius:14px; padding:18px; margin-bottom:12px;}
+  .summary .row{display:flex; justify-content:space-between; align-items:center; gap:12px;}
+  .summary .label{font-size:16px; font-weight:700;}
+  .summary .total{font-size:28px; font-weight:800; color:var(--indigo); letter-spacing:-0.5px;}
+  .cats{display:flex; gap:12px; margin-bottom:16px;}
+  .cat{flex:1; border-radius:12px; padding:14px; border:1px solid var(--line);}
+  .cat.bank{background:var(--bank-bg);}
+  .cat.sec{background:var(--sec-bg);}
+  .cat .name{font-weight:700; font-size:14px; display:flex; align-items:center; gap:6px;}
+  .cat.bank .name{color:var(--bank);}
+  .cat.sec .name{color:var(--sec);}
+  .cat .amt{font-size:20px; font-weight:800; margin:6px 0 2px;}
+  .cat .pct{font-size:12px; color:var(--grey);}
+
+  .form{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px;}
+  .form h2{font-size:15px; margin:0 0 12px;}
+  .fields{display:flex; flex-wrap:wrap; gap:10px;}
+  .field{display:flex; flex-direction:column; gap:4px;}
+  .field.grow{flex:1 1 160px;}
+  .field label{font-size:11px; color:var(--grey);}
+  input,select{
+    font-size:16px; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    background:var(--card); color:var(--text); width:100%;
+  }
+  input:focus,select:focus{outline:2px solid var(--indigo); outline-offset:0; border-color:transparent;}
+  .btn{
+    background:var(--indigo); color:#fff; border:none; border-radius:10px;
+    font-size:16px; font-weight:700; padding:12px 20px; cursor:pointer; width:100%;
+  }
+  .btn:active{opacity:.85;}
+  .add-wrap{align-self:flex-end; flex:1 1 120px;}
+  .err{color:#dc2626; font-size:12px; margin-top:8px; min-height:1em;}
+
+  .kind-head{display:flex; align-items:center; gap:8px; margin:18px 2px 8px; font-weight:800;}
+  .kind-head.bank{color:var(--bank);}
+  .kind-head.sec{color:var(--sec);}
+  .kind-head .ktotal{color:var(--grey); font-weight:600; font-size:14px;}
+
+  .inst{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px;}
+  .inst .ihead{display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:16px; margin-bottom:8px;}
+  .inst .ihead .isum{font-weight:800;}
+  .inst.bank .ihead .isum{color:var(--bank);}
+  .inst.sec .ihead .isum{color:var(--sec);}
+  hr.d{border:none; border-top:1px solid var(--line); margin:8px 0;}
+  .item{display:flex; align-items:center; gap:8px; padding:6px 0;}
+  .item .meta{flex:1; min-width:0;}
+  .item .nm{font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .item .ip{font-size:11px; color:var(--grey);}
+  .item .amt-in{width:130px;}
+  .item .amt-in input{text-align:right; padding:8px 10px; font-size:15px;}
+  .del{background:none; border:none; color:#ef4444; font-size:20px; cursor:pointer; padding:4px 8px; line-height:1;}
+  .empty{color:var(--grey); text-align:center; padding:28px 12px; background:var(--card); border:1px dashed var(--line); border-radius:12px;}
+
+  .foot{margin-top:24px; color:var(--grey); font-size:11px; line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📊 投資ポートフォリオ一覧</h1>
+  <p class="sub">銀行・証券の保有資産を入力すると、合計と構成比がその場で更新されます。データはこの端末のブラウザ内にのみ保存されます。</p>
+
+  <div class="summary">
+    <div class="row">
+      <span class="label">総資産評価額</span>
+      <span class="total" id="grandTotal">¥0</span>
+    </div>
+  </div>
+
+  <div class="cats">
+    <div class="cat bank">
+      <div class="name">🏦 銀行</div>
+      <div class="amt" id="bankAmt">¥0</div>
+      <div class="pct" id="bankPct">構成比 0.0%</div>
+    </div>
+    <div class="cat sec">
+      <div class="name">📈 証券</div>
+      <div class="amt" id="secAmt">¥0</div>
+      <div class="pct" id="secPct">構成比 0.0%</div>
+    </div>
+  </div>
+
+  <div class="form">
+    <h2>保有資産を追加</h2>
+    <div class="fields">
+      <div class="field">
+        <label for="kind">種別</label>
+        <select id="kind">
+          <option value="銀行">銀行</option>
+          <option value="証券">証券</option>
+        </select>
+      </div>
+      <div class="field grow">
+        <label for="institution">金融機関名</label>
+        <input id="institution" type="text" placeholder="例: 〇〇銀行 / 〇〇証券" autocomplete="off">
+      </div>
+      <div class="field grow">
+        <label for="pname">商品・口座名</label>
+        <input id="pname" type="text" placeholder="例: 普通預金 / 投資信託A" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="amount">金額（円）</label>
+        <input id="amount" type="number" inputmode="numeric" placeholder="500000" min="0">
+      </div>
+      <div class="field add-wrap">
+        <label>&nbsp;</label>
+        <button class="btn" id="addBtn">＋ 追加</button>
+      </div>
+    </div>
+    <div class="err" id="formErr"></div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="foot">
+    <p>※ 株価・基準価額の自動取得はありません（手入力の評価額を管理する用途）。<br>
+    ※ データは端末ローカル保存のため、他の端末やブラウザには引き継がれません。ブラウザのデータ消去で消えます。</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORAGE_KEY = "investment_tracker.holdings.v1";
+  var KINDS = ["銀行", "証券"];
+  var holdings = [];
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      holdings = raw ? JSON.parse(raw) : [];
+      if(!Array.isArray(holdings)) holdings = [];
+    }catch(e){ holdings = []; }
+  }
+  function save(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings)); }catch(e){}
+  }
+  function yen(v){
+    if(isNaN(v)) v = 0;
+    return "¥" + Math.round(v).toLocaleString("ja-JP");
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function newId(){ return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7); }
+
+  function totals(){
+    var total = 0, byKind = {"銀行":0, "証券":0};
+    holdings.forEach(function(h){
+      var a = Number(h.amount) || 0;
+      total += a;
+      byKind[h.kind] = (byKind[h.kind] || 0) + a;
+    });
+    return {total: total, byKind: byKind};
+  }
+
+  function updateSummary(){
+    var t = totals();
+    document.getElementById("grandTotal").textContent = yen(t.total);
+    var bank = t.byKind["銀行"] || 0, sec = t.byKind["証券"] || 0;
+    document.getElementById("bankAmt").textContent = yen(bank);
+    document.getElementById("secAmt").textContent = yen(sec);
+    document.getElementById("bankPct").textContent = "構成比 " + (t.total ? (bank/t.total*100).toFixed(1) : "0.0") + "%";
+    document.getElementById("secPct").textContent = "構成比 " + (t.total ? (sec/t.total*100).toFixed(1) : "0.0") + "%";
+  }
+
+  function renderList(){
+    var t = totals();
+    var el = document.getElementById("list");
+    if(holdings.length === 0){
+      el.innerHTML = '<div class="empty">まだ登録がありません。上のフォームから銀行・証券の保有資産を追加してください。</div>';
+      return;
+    }
+    var html = "";
+    KINDS.forEach(function(kind){
+      var items = holdings.filter(function(h){ return h.kind === kind; });
+      if(items.length === 0) return;
+      var cls = kind === "銀行" ? "bank" : "sec";
+      var icon = kind === "銀行" ? "🏦" : "📈";
+      var kindTotal = items.reduce(function(s, h){ return s + (Number(h.amount)||0); }, 0);
+      html += '<div class="kind-head '+cls+'">'+icon+' '+kind+' <span class="ktotal">'+yen(kindTotal)+'</span></div>';
+
+      // 金融機関ごとにまとめる（登場順維持）
+      var order = [], groups = {};
+      items.forEach(function(h){
+        if(!groups[h.institution]){ groups[h.institution] = []; order.push(h.institution); }
+        groups[h.institution].push(h);
+      });
+      order.forEach(function(inst){
+        var g = groups[inst];
+        var instTotal = g.reduce(function(s,h){ return s + (Number(h.amount)||0); }, 0);
+        html += '<div class="inst '+cls+'">';
+        html += '<div class="ihead"><span>'+esc(inst)+'</span><span class="isum">'+yen(instTotal)+'</span></div>';
+        html += '<hr class="d">';
+        g.forEach(function(h){
+          var pct = t.total ? ((Number(h.amount)||0)/t.total*100).toFixed(1) : "0.0";
+          html += '<div class="item">'
+            + '<div class="meta"><div class="nm">'+esc(h.name)+'</div><div class="ip" data-pct="'+h.id+'">構成比 '+pct+'%</div></div>'
+            + '<div class="amt-in"><input type="number" inputmode="numeric" min="0" value="'+(Number(h.amount)||0)+'" data-id="'+h.id+'"></div>'
+            + '<button class="del" data-del="'+h.id+'" aria-label="削除">🗑</button>'
+            + '</div>';
+        });
+        html += '</div>';
+      });
+    });
+    el.innerHTML = html;
+
+    // インライン金額編集：入力のたびに合計・構成比を即時更新
+    Array.prototype.forEach.call(el.querySelectorAll('input[data-id]'), function(inp){
+      inp.addEventListener("input", function(){
+        var id = inp.getAttribute("data-id");
+        var val = parseInt(inp.value, 10);
+        if(isNaN(val) || val < 0) val = 0;
+        for(var i=0;i<holdings.length;i++){
+          if(holdings[i].id === id){ holdings[i].amount = val; break; }
+        }
+        save();
+        updateSummary();
+        updatePercents();
+      });
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('button[data-del]'), function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-del");
+        holdings = holdings.filter(function(h){ return h.id !== id; });
+        save();
+        render();
+      });
+    });
+  }
+
+  // 一覧を作り直さずに各行の構成比だけ更新（インライン編集時のちらつき防止）
+  function updatePercents(){
+    var t = totals();
+    holdings.forEach(function(h){
+      var node = document.querySelector('.ip[data-pct="'+h.id+'"]');
+      if(node){
+        var pct = t.total ? ((Number(h.amount)||0)/t.total*100).toFixed(1) : "0.0";
+        node.textContent = "構成比 " + pct + "%";
+      }
+    });
+    // 金融機関・種別の小計も更新するため、見出し系はrenderで作られている値を軽く更新
+    updateInstSums();
+  }
+  function updateInstSums(){
+    // 種別小計
+    KINDS.forEach(function(kind){
+      var items = holdings.filter(function(h){ return h.kind === kind; });
+      var sum = items.reduce(function(s,h){ return s + (Number(h.amount)||0); }, 0);
+      var head = document.querySelector('.kind-head.' + (kind==="銀行"?"bank":"sec") + ' .ktotal');
+      if(head) head.textContent = yen(sum);
+    });
+  }
+
+  function render(){
+    updateSummary();
+    renderList();
+  }
+
+  function addItem(){
+    var kind = document.getElementById("kind").value;
+    var inst = document.getElementById("institution").value.trim();
+    var name = document.getElementById("pname").value.trim();
+    var amtRaw = document.getElementById("amount").value.trim();
+    var err = document.getElementById("formErr");
+    err.textContent = "";
+
+    if(!inst){ err.textContent = "金融機関名を入力してください。"; return; }
+    if(!name){ err.textContent = "商品・口座名を入力してください。"; return; }
+    var amt = parseInt(amtRaw, 10);
+    if(amtRaw === "" || isNaN(amt)){ err.textContent = "金額は数字で入力してください。"; return; }
+    if(amt < 0){ err.textContent = "金額は0以上で入力してください。"; return; }
+
+    holdings.push({id:newId(), kind:kind, institution:inst, name:name, amount:amt});
+    save();
+    document.getElementById("institution").value = "";
+    document.getElementById("pname").value = "";
+    document.getElementById("amount").value = "";
+    render();
+    document.getElementById("institution").focus();
+  }
+
+  document.getElementById("addBtn").addEventListener("click", addItem);
+  document.getElementById("amount").addEventListener("keydown", function(e){
+    if(e.key === "Enter") addItem();
+  });
+
+  load();
+  render();
+
+  // Service Worker（オフライン動作 & ホーム画面アプリ化）
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    });
+  }
+})();
+</script>
+</body>
+</html>
