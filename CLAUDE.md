@@ -15,13 +15,25 @@
    - コード検索: 12ルート × 19タイプ = 228コードのダイアグラム表示＋再生
 
 2. **翌月資金移動プランナー（`payment_planner.py`）**
-   - GAS（Google Apps Script）の Web アプリから支払い予定を取得して表示する Flet アプリ
+   - GAS（Google Apps Script）の Web アプリから支払い予定を取得して表示する Flet アプリ（1ファイル完結）
+   - 振替元口座ごとに集計・表示する家計ツール。Render に Docker でデプロイして運用
    - GAS の URL は**環境変数 `GAS_URL`** で渡す（コードに書かない）
+   - 環境変数: `GAS_URL`（必須）、`PORT`（既定 8080）
+   - GAS が返す JSON 形式: `[{"振替元口座": str, "日付": int, "支払い先": str, "金額": int|str}, ...]`
+   - 実行: `pip install -r requirements.txt` → `GAS_URL=<URL> python payment_planner.py`（→ http://localhost:8080 ）
+
+### 開発時のハマりどころ（payment_planner.py）
+- **flet はバージョンを固定してある**（破壊的変更が多いため `requirements.txt` で固定）。更新するときは必ず起動確認する。
+- flet 0.80 以降 `ft.app()` は非推奨（0.85 では動作する）。置き換えるなら `ft.run(main)`。
+- Web 実行には `flet-web` が必要。`requirements.txt` に含めてある（無いと起動時にダウンロードが走る）。
 
 ### セキュリティ上の重要事項
 - `GAS_URL` は**秘密情報**。URL を知る人は誰でも支払いデータ（口座名・支払先・金額）を取得できる。
 - URL・APIキー・トークンの類いは**絶対にコードや README に直接書かない**。環境変数か `.env`（gitignore済み）を使う。
 - 万一コミット・push してしまったら、履歴から消すだけでは不十分。**GAS 側で該当デプロイをアーカイブし、新しい URL で再デプロイ**して漏れた URL を無効化する。
+
+### コミット規約
+- コミットメッセージは**日本語1行で「何をなぜ」**（例: `GAS取得にタイムアウト10秒を追加`）。
 
 ## オーナーとのコミュニケーションについて
 
